@@ -1,0 +1,11 @@
+.env
+.env.local
+node_modules
+venv
+.git
+.gitignore
+AGENTS.md
+README.md
+dev.mjs
+.vite
+api/_dev_handler.py

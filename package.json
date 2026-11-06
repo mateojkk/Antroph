@@ -1,0 +1,13 @@
+{
+  "name": "antroph",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "@mysten-incubation/memwal": "^0.1.12"
+  },
+  "scripts": {
+    "dev": "node dev.mjs",
+    "build": "cd frontend && npm run build",
+    "preview": "cd frontend && npm run preview"
+  }
+}
