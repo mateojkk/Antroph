@@ -6,7 +6,7 @@ import React, {
   useCallback,
   useMemo,
 } from "react";
-import { useCurrentAccount, useDisconnectWallet } from "@mysten/dapp-kit";
+import { useCurrentAccount, useDAppKit } from "@mysten/dapp-kit-react";
 import { setCurrentWalletAddress } from "../lib/api";
 import {
   normalizeAddress,
@@ -89,7 +89,7 @@ async function loadProfile(
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const account = useCurrentAccount();
   const address = normalizeAddress(account?.address) ?? undefined;
-  const { mutate: disconnect } = useDisconnectWallet();
+  const dAppKit = useDAppKit();
 
   const [enrichedUser, setEnrichedUser] = useState<AuthUser | null>(null);
 
@@ -121,10 +121,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const signOut = useCallback(() => {
-    disconnect();
+    void dAppKit.disconnectWallet();
     setCurrentWalletAddress(null);
     setEnrichedUser(null);
-  }, [disconnect]);
+  }, [dAppKit]);
 
   const refreshUser = useCallback(async () => {
     if (!address) throw new Error("No wallet connected");

@@ -1,19 +1,31 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  useCurrentAccount,
-  useSignAndExecuteTransaction,
-  useSignPersonalMessage,
-} from "@mysten/dapp-kit";
+import { useCurrentAccount, useDAppKit } from "@mysten/dapp-kit-react";
 import { MemWal } from "@mysten-incubation/memwal";
 import {
   createAccount,
   generateDelegateKey,
 } from "@mysten-incubation/memwal/account";
-import type { SuiJsonRpcClient } from "@mysten/sui/jsonRpc";
 import { Transaction } from "@mysten/sui/transactions";
 import { apiGet, apiPatch } from "../lib/api";
-import { findMemWalAccountId } from "../lib/suiClient";
+import { findMemWalAccountId, grpcClient, type SuiNetwork } from "../lib/suiClient";
 import { useAuth } from "./useAuth";
+
+const SUI_NETWORK = (import.meta.env.VITE_SUI_NETWORK ?? "mainnet") as SuiNetwork;
+/** MemWal account SDK only documents mainnet and testnet. */
+const MEMWAL_NETWORK: "mainnet" | "testnet" =
+  SUI_NETWORK === "testnet" ? "testnet" : "mainnet";
+
+function transactionDigest(result: unknown): string {
+  if (result && typeof result === "object" && "digest" in result) {
+    const digest = (result as { digest?: unknown }).digest;
+    if (typeof digest === "string" && digest) return digest;
+  }
+  if (result && typeof result === "object" && "Transaction" in result) {
+    const inner = (result as { Transaction?: { digest?: string } }).Transaction;
+    if (inner?.digest) return inner.digest;
+  }
+  return "";
+}
 
 // Always route MemWal requests through our own backend proxy (/api/memwal).
 // The upstream relayer (relayer.memory.walrus.xyz) doesn't return
@@ -158,41 +170,6 @@ async function findExistingAccount(
   }
 }
 
-/**
- * Minimal Sui client for the MemWal SDK. The SDK only uses
- * `waitForTransaction()` after the wallet signs; route that through our
- * Tatum-backed /api/sui/tx endpoint instead of the dead JSON-RPC fullnode.
- */
-function memwalTxClient(): SuiJsonRpcClient {
-  return {
-    waitForTransaction: async ({ digest }: { digest: string }) => {
-      const deadline = Date.now() + 90_000;
-      let lastError: unknown = null;
-      while (Date.now() < deadline) {
-        try {
-          const tx = await apiGet<{
-            digest: string;
-            effects?: { status?: { status?: string } };
-          }>(`/sui/tx?digest=${encodeURIComponent(digest)}`);
-          if (tx?.digest) {
-            if (tx.effects?.status?.status === "failure") {
-              throw new Error(`Transaction ${digest} failed on mainnet`);
-            }
-            return tx;
-          }
-        } catch (err) {
-          // 404 while the gateway hasn't indexed the tx yet: keep polling.
-          lastError = err;
-        }
-        await new Promise((resolve) => setTimeout(resolve, 1_500));
-      }
-      throw lastError instanceof Error
-        ? lastError
-        : new Error(`Timed out waiting for transaction ${digest}`);
-    },
-  } as unknown as SuiJsonRpcClient;
-}
-
 export interface UseMemWalResult {
   memwal: MemWal | null;
   delegateAddress: string | null;
@@ -214,12 +191,8 @@ export interface UseMemWalResult {
 export function useMemWal(): UseMemWalResult {
   const account = useCurrentAccount();
   const address = account?.address;
-  // Poll tx status via our read-only /api/sui/tx proxy (no JSON-RPC from the browser).
-  const txClient = useMemo(memwalTxClient, []);
-  // Let the wallet sign and broadcast (People Book pattern). A custom execute hook
-  // that POSTs signed bytes to our origin looks like a drainer relay to Slush.
-  const { mutateAsync: signAndExecuteTransaction } = useSignAndExecuteTransaction();
-  const { mutateAsync: signPersonalMessage } = useSignPersonalMessage();
+  const dAppKit = useDAppKit();
+  const chainClient = useMemo(() => grpcClient(SUI_NETWORK), []);
   const { user } = useAuth();
 
   const [delegate, setDelegate] = useState<StoredDelegate | null>(null);
@@ -274,13 +247,20 @@ export function useMemWal(): UseMemWalResult {
       }: {
         transaction: Transaction;
       }) => {
-        return signAndExecuteTransaction({ transaction });
+        const result = await dAppKit.signAndExecuteTransaction({
+          transaction: transaction as never,
+        });
+        const digest = transactionDigest(result);
+        if (!digest) {
+          throw new Error("Wallet did not return a transaction digest");
+        }
+        return { digest };
       },
       signPersonalMessage: async ({ message }: { message: Uint8Array }) => {
-        return signPersonalMessage({ message });
+        return dAppKit.signPersonalMessage({ message });
       },
     };
-  }, [address, signAndExecuteTransaction, signPersonalMessage]);
+  }, [address, dAppKit]);
 
   const authorize = useCallback(async () => {
     if (!address) {
@@ -293,10 +273,6 @@ export function useMemWal(): UseMemWalResult {
     }
     if (!walletSigner) {
       setError("Wallet signer not ready");
-      return;
-    }
-    if (!txClient) {
-      setError("Sui client not ready");
       return;
     }
     if (!SERVER_URL) {
@@ -340,7 +316,8 @@ export function useMemWal(): UseMemWalResult {
             packageId: PACKAGE_ID,
             registryId: REGISTRY_ID,
             walletSigner,
-            suiClient: txClient,
+            suiClient: chainClient as never,
+            suiNetwork: MEMWAL_NETWORK,
           });
           currentAccountId = created.accountId;
           if (currentAccountId && address) {
@@ -413,7 +390,7 @@ export function useMemWal(): UseMemWalResult {
     } finally {
       setLoading(false);
     }
-  }, [address, delegate, walletSigner, txClient]);
+  }, [address, delegate, walletSigner, chainClient]);
 
   const remember = useCallback(
     async (text: string) => {

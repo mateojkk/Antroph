@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
-import { ConnectButton } from "@mysten/dapp-kit";
+import { ConnectButton } from "@mysten/dapp-kit-react/ui";
 
 function VelaLogo({ className }: { className?: string }) {
   const [failed, setFailed] = useState(false);
@@ -60,10 +60,9 @@ export default function Login() {
           </h2>
 
           <div className="flex justify-center">
-            <ConnectButton
-              connectText="Connect Sui Wallet"
-              className="!rounded-md !border !border-border !bg-background !px-6 !py-3 !font-mono !font-medium !text-foreground !transition-colors hover:!bg-accent"
-            />
+            <ConnectButton className="antroph-connect-button">
+              Connect Sui Wallet
+            </ConnectButton>
           </div>
 
           <p className="mt-6 text-center text-xs text-muted-foreground">

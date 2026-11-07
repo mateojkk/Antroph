@@ -66,7 +66,7 @@ MemWal account model: each connected wallet owns its own `MemWalAccount` on-chai
 ## Frontend toolchain quirks
 
 - Tailwind CSS v4 is imported in `frontend/src/index.css` with `@import "tailwindcss";`; there is no `tailwind.config.js`. Custom theme tokens are defined via `@theme` in the same file.
-- `@mysten/sui` is **not** bundled; `vite.config.ts` externalizes it and injects an importmap pointing to `https://esm.sh/`. `@mysten/dapp-kit` and `@mysten-incubation/memwal` are bundled. `index.html` CSP allows `https://esm.sh`.
+- Frontend wallet stack is `@mysten/dapp-kit-react` v2 (`createDAppKit` + `slushWalletConfig: { appName: "Antroph" }`). `@mysten/sui` is bundled with Vite (no `esm.sh` import map).
 - `frontend/tsconfig.json` uses project references (`tsconfig.app.json`, `tsconfig.node.json`). Build runs `tsc -b` (project-level typecheck).
 - The UI uses Inter as the primary sans-serif font for readability, with JetBrains Mono reserved for numerical/tabular data (`font-mono`). Dark theme only — `color-scheme: dark`.
 
