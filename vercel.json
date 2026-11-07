@@ -6,7 +6,11 @@
       "framework": "vite",
       "installCommand": "cd .. && npm install",
       "buildCommand": "npm run build",
-      "outputDirectory": "dist"
+      "outputDirectory": "dist",
+      "routes": [
+        { "handle": "filesystem" },
+        { "src": "/(.*)", "dest": "/index.html" }
+      ]
     },
     "api": {
       "root": ".",
@@ -61,11 +65,12 @@
         "service": "api"
       }
     },
+    { "handle": "filesystem" },
     {
       "source": "/((?!api/).*)",
       "destination": {
         "service": "frontend",
-        "path": "/index.html"
+        "path": "index.html"
       }
     }
   ],
