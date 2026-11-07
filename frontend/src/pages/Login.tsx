@@ -66,7 +66,8 @@ export default function Login() {
           </div>
 
           <p className="mt-6 text-center text-xs text-muted-foreground">
-            Connect any Sui wallet to predict, chat, and store memories on Walrus Mainnet.
+            Use the Slush browser extension. The web wallet popup is off because it
+            blocks this site before you can approve.
           </p>
         </div>
       </div>

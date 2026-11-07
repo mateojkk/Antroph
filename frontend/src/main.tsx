@@ -14,7 +14,10 @@ const dAppKit = createDAppKit({
   defaultNetwork: network,
   createClient: (name) => grpcClient(name as SuiNetwork),
   storageKey: "antroph-dappkit",
-  slushWalletConfig: { appName: "Antroph" },
+  // Browser extension only. The Slush web popup (my.slush.app) flags this
+  // origin before connect; null skips registerSlushWallet entirely, which is
+  // what the extension path does when the extension is already installed.
+  slushWalletConfig: null,
 });
 
 const queryClient = new QueryClient({
