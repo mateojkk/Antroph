@@ -15,11 +15,11 @@ sections rather than failing the request.
 
 import asyncio
 import json
-import os
 import urllib.request
 from http.server import BaseHTTPRequestHandler
 
-from lib.common import get_supabase, send_json, options
+from lib.common import get_supabase, send_json, options, agentmem_headers, agentmem_request_url
+from lib.players import public_players
 
 
 def _buckets() -> list:
@@ -57,9 +57,10 @@ def _top_users() -> list:
         .select("user_id, username, display_name, correct, total_predictions, accuracy_pct, rank")
         .gt("total_predictions", 0)
         .order("rank_score", desc=True)
-        .limit(3)
+        .limit(50)
         .execute()
     ).data or []
+    rows = public_players(rows)[:3]
     return [
         {
             "username": r.get("username") or r.get("user_id"),
@@ -77,7 +78,7 @@ def _agent_lessons() -> list:
 
     Best-effort: agent memory being unavailable must not trip the endpoint.
     """
-    base = (os.environ.get("AGENTMEM_URL") or "http://localhost:3000/api/agentmem").rstrip("/")
+    base = agentmem_request_url()
     payload = json.dumps({
         "op": "recall",
         "query": "scorecard prediction correct incorrect result",
@@ -86,7 +87,7 @@ def _agent_lessons() -> list:
     req = urllib.request.Request(
         base,
         data=payload,
-        headers={"Content-Type": "application/json"},
+        headers=agentmem_headers(),
         method="POST",
     )
     try:

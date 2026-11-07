@@ -6,6 +6,11 @@ venv
 .gitignore
 AGENTS.md
 README.md
+handoff.md
 dev.mjs
+fix.py
+scripts
+supabase
 .vite
 api/_dev_handler.py
+api/_dev_stream_handler.py

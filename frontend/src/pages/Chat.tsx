@@ -156,52 +156,39 @@ export default function Chat() {
     message: string,
     history: AgentMessage[]
   ): Promise<MemoryContext> {
-    // Provide some recent context to the recall query so pronouns (he, they, it)
-    // have a better chance of matching semantically related memories.
+    // Pronouns ("he", "they") match better when the last few turns ride along.
     const recentContext = history
       .slice(-3)
       .map((m) => m.content)
       .join(" ");
     const queryContext = recentContext ? `${recentContext} ${message}` : message;
+    const empty = { results: [] as { text: string }[] };
 
-    const [relevant, recent, velaContext, opinions, vela] = await Promise.all([
-      // 1. Broad semantic search using recent context + current message
-      recall(queryContext, { limit: 10 })
-        .then((r) => r.results.map((m) => m.text))
-        .catch(() => []),
-      // 2. Search specifically for past user messages matching the context
-      recall(`User said: ${queryContext}`, { limit: 10 })
-        .then((r) => r.results.map((m) => m.text))
-        .catch(() => []),
-      // 3. Search specifically for Antroph's past replies, including ones stored under the old name
-      recall(`Antroph replied: ${queryContext}`, { limit: 10 })
-        .then(async (r) => {
-          const older = await recall(`Vela replied: ${queryContext}`, { limit: 10 }).catch(() => ({ results: [] as { text: string }[] }));
-          return [...r.results, ...older.results].map((m) => m.text);
-        })
-        .catch(() => []),
-      // 4. General user takes
-      recall("User said: I think feel believe opinion", { limit: 10 })
-        .then((r) => r.results.map((m) => m.text))
-        .catch(() => []),
-      // 5. General Antroph takes, including ones stored under the old name
-      recall("Antroph replied: prediction pick call", { limit: 10 })
-        .then(async (r) => {
-          const older = await recall("Vela replied: prediction pick call", { limit: 10 }).catch(() => ({ results: [] as { text: string }[] }));
-          return [...r.results, ...older.results].map((m) => m.text);
-        })
-        .catch(() => []),
+    // Each recall is capped. A slow Walrus query must not hold the reply.
+    const bounded = (query: string, limit: number) =>
+      Promise.race([
+        recall(query, { limit }).catch(() => empty),
+        new Promise<typeof empty>((resolve) => setTimeout(() => resolve(empty), 700)),
+      ]);
+
+    const [relevant, recent, antroph, older, opinions, vela] = await Promise.all([
+      bounded(queryContext, 6),
+      bounded(`User said: ${queryContext}`, 4),
+      bounded(`Antroph replied: ${queryContext}`, 4),
+      bounded(`Vela replied: ${queryContext}`, 4),
+      bounded("User said: I think feel believe opinion", 4),
+      bounded("Antroph replied: prediction pick call", 4),
     ]);
 
-    // Deduplicate exact strings across the different query results
+    const texts = (r: { results: { text: string }[] }) => r.results.map((m) => m.text);
     const unique = (arr: string[]) => Array.from(new Set(arr));
 
     return {
-      relevant_memories: unique([...relevant, ...recent, ...velaContext]),
-      recent_memories: [], // Unused / merged into relevant
+      relevant_memories: unique([...texts(relevant), ...texts(recent), ...texts(antroph), ...texts(older)]),
+      recent_memories: [],
       failed_predictions: [],
-      user_opinions: unique(opinions),
-      vela_predictions: unique(vela),
+      user_opinions: unique(texts(opinions)),
+      vela_predictions: unique(texts(vela)),
     };
   }
 
@@ -225,9 +212,7 @@ export default function Chat() {
         }
       }
 
-      // Add a placeholder assistant message that we'll fill token-by-token.
       let streamedReply = "";
-      setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
 
       let finalSessionId = activeSessionId;
 
@@ -244,9 +229,13 @@ export default function Chat() {
         (token) => {
           streamedReply += token;
           setMessages((prev) => {
-            const next = [...prev];
-            next[next.length - 1] = { role: "assistant", content: streamedReply };
-            return next;
+            const last = prev[prev.length - 1];
+            if (last?.role === "assistant") {
+              const next = [...prev];
+              next[next.length - 1] = { role: "assistant", content: streamedReply };
+              return next;
+            }
+            return [...prev, { role: "assistant", content: streamedReply }];
           });
         },
         // onDone — capture session id
@@ -537,7 +526,7 @@ export default function Chat() {
               </div>
             ))}
 
-            {loading && (
+            {loading && messages[messages.length - 1]?.role !== "assistant" && (
               <div className="flex justify-start gap-3">
                 <img
                   src="/antroph.jpg"

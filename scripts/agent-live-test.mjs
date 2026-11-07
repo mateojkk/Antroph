@@ -5,7 +5,7 @@
 import { config as loadEnv } from "./load-env.mjs";
 loadEnv();
 
-const { agentRememberAndWait, agentRecall } = await import("../lib/agent-mem.mjs");
+const { agentRememberAndWait, agentRecall } = await import("../packages/agent-mem/index.mjs");
 
 const text = `Setup check ${new Date().toISOString()}: Vela agent memory wiring works.`;
 

@@ -19,6 +19,12 @@ import importlib.util
 from io import BytesIO
 from http.server import BaseHTTPRequestHandler
 
+# Windows consoles default to cp1252; SSE bodies are UTF-8.
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+except Exception:
+    pass
+
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
 

@@ -1,27 +1,70 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "framework": null,
-  "installCommand": "cd frontend && npm install",
-  "buildCommand": "cd frontend && npm run build",
-  "outputDirectory": "frontend/dist",
-  "rewrites": [
-    { "source": "/api/agent_stream", "destination": "/api/agent_stream.py" },
-    { "source": "/api/agentmem", "destination": "/api/agentmem.mjs" },
-    { "source": "/api/(.*)", "destination": "/api/index.py" },
-    { "source": "/(.*)", "destination": "/index.html" }
-  ],
-  "functions": {
-    "api/index.py": {
-      "maxDuration": 60
+  "services": {
+    "frontend": {
+      "root": "frontend",
+      "framework": "vite",
+      "installCommand": "cd .. && npm install",
+      "buildCommand": "npm run build",
+      "outputDirectory": "dist"
     },
-    "api/agent_stream.py": {
-      "maxDuration": 60
+    "api": {
+      "root": ".",
+      "runtime": "python",
+      "installCommand": "pip install -r api/requirements.txt",
+      "functions": {
+        "api/index.py": {
+          "maxDuration": 60,
+          "excludeFiles": "{frontend/**,node_modules/**,venv/**,scripts/**,supabase/**,.git/**}"
+        },
+        "api/agent_stream.py": {
+          "maxDuration": 60,
+          "excludeFiles": "{frontend/**,node_modules/**,venv/**,scripts/**,supabase/**,.git/**}"
+        }
+      },
+      "bindings": [
+        {
+          "type": "service",
+          "service": "agentmem",
+          "format": "url",
+          "env": "AGENTMEM_URL"
+        }
+      ]
     },
-    "api/agentmem.mjs": {
-      "maxDuration": 60
+    "agentmem": {
+      "root": "services/agentmem",
+      "installCommand": "cd ../.. && npm install",
+      "functions": {
+        "api/index.mjs": {
+          "maxDuration": 60
+        }
+      }
     }
   },
+  "rewrites": [
+    {
+      "source": "/api/agent_stream",
+      "destination": {
+        "service": "api"
+      }
+    },
+    {
+      "source": "/api/(.*)",
+      "destination": {
+        "service": "api"
+      }
+    },
+    {
+      "source": "/(.*)",
+      "destination": {
+        "service": "frontend"
+      }
+    }
+  ],
   "crons": [
-    { "path": "/api/resolve", "schedule": "0 0 * * *" }
+    {
+      "path": "/api/resolve",
+      "schedule": "0 0 * * *"
+    }
   ]
 }

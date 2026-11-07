@@ -1,0 +1,10 @@
+{
+  "name": "@antroph/agent-mem",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": "./index.mjs",
+  "dependencies": {
+    "@mysten-incubation/memwal": "^0.1.12"
+  }
+}

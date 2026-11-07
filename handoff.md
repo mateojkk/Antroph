@@ -1,6 +1,6 @@
-# Vela — Handoff
+# Antroph — Handoff
 
-**Last updated:** 2026-11-06
+**Last updated:** 2026-11-07
 **Deadline:** Total Recall (Tatum × Walrus Memory) — submissions close **10 Nov 2026, 17:00 UTC** (~4 days)
 **Submission:** Track 1 — Markets & Sports Prediction (theme "The Memory Layer")
 
@@ -8,7 +8,7 @@
 
 ## 1. What this is
 
-**Vela** is an AI football rival that keeps memory: users make predictions, Vela argues back with its own picks, and every resolved match writes a **scorecard memory** to **Walrus Memory (mainnet)**. The feed then shows "What Vela learned" — confidence-bucket accuracy plus lessons recalled from the agent's own Walrus namespace.
+**Antroph** is an AI football rival that keeps memory: users make predictions, Antroph argues back with its own picks, and every resolved match writes a **scorecard memory** to **Walrus Memory (mainnet)**. The feed then shows "What Antroph learned" — confidence-bucket accuracy plus lessons recalled from the agent's own Walrus namespace.
 
 The hackathon angle: **memory is the product, not the storage**. Scorecards are the learning loop; Tatum is the onchain verification/read layer.
 
@@ -21,7 +21,7 @@ The hackathon angle: **memory is the product, not the storage**. Scorecards are 
 ### End-to-end pipeline (ran live, real credentials)
 ```
 football-data.org ──▶ /api/markets             ✅ fixtures live
-picks               ──▶ /api/predict           ✅ 201, writes predictions + Vela's counter-pick (Groq)
+picks               ──▶ /api/predict           ✅ 201, writes predictions + Antroph's counter-pick (heuristic)
 match results       ──▶ /api/resolve           ✅ resolved 4 picks, updated leaderboard
 scorecards          ──▶ Walrus Memory mainnet  ✅ 4 blobs minted + recalled
 feed                ──▶ /api/credibility       ✅ buckets + top users + agent lessons
@@ -38,7 +38,7 @@ feed                ──▶ /api/credibility       ✅ buckets + top users + a
   - `Scorecard: user predicted São Paulo FC in São Paulo FC vs SC Corinthians Paulista. Result: incorrect.`
   - `Scorecard: user predicted Draw in São Paulo FC vs SC Corinthians Paulista. Result: correct.`
 
-**Memory count on mainnet: 5** (1 setup + 4 scorecards). **Track 1 requires ≥10** → seed script still needed (see §6).
+**Memory count on mainnet: 4 product scorecards + 1 setup check.** On 2026-11-07 a seeding experiment added 9 identity/lesson notes before being stopped; Walrus is append-only, so those blobs remain in the `vela-colony` namespace. Do **not** pad the count with synthetic entries going forward. The honest way to grow memory is through real use: every resolved prediction writes a scorecard, and chat/prediction flows write user memories (see §6).
 
 ### Credentials in `.env` (NO SECRETS IN THIS DOC)
 | Key | Status |
@@ -55,7 +55,7 @@ feed                ──▶ /api/credibility       ✅ buckets + top users + a
 
 Submission form needs:
 - `MEMWAL_AGENT_ID` = agent public key `24567ae3e208aa47245ee31e895107778094ba978f5ba1840b9ed7dc5d11e640`
-- Tatum **dashboard account ID** (still to copy from dashboard.tatum.io → profile/account)
+- Tatum **dashboard account ID** = `6a1070146dcffd29f3320dbd` ✅
 - Repo URL, demo URL, blog post URL
 
 ---
@@ -66,7 +66,7 @@ Submission form needs:
 | Path | Purpose |
 |---|---|
 | `api/index.py` | dispatcher; handlers registered here (`agent`, `brief`, `called_it`, `chat`, `credibility`, `health`, `markets`, `predict`, `resolve`, `tatum`, …) |
-| `handlers/predict.py` | writes user pick + generates Vela counter-pick via Groq; stores prediction |
+| `handlers/predict.py` | writes user pick + generates Antroph counter-pick heuristically from confidence; stores prediction |
 | `handlers/resolve.py` | resolves vs football-data results; updates leaderboard; writes **scorecard memories** to Walrus (batched, capped by `AGENTMEM_MAX_WRITES`) |
 | `handlers/credibility.py` | confidence buckets, top users, agent lessons (recall via `AGENTMEM_URL`) |
 | `handlers/tatum.py` | `/api/tatum/graphql` (read-only proxy), `/api/tatum/rpc` (legacy), `/api/tatum/status`, `/api/tatum/verify?digest=` |
@@ -78,7 +78,7 @@ Submission form needs:
 | `lib/common.py` | Supabase/Groq clients, auth (`X-User-Email`), helpers |
 
 ### Frontend (React + Vite)
-- `frontend/src/pages/Feed.tsx` — fixtures, **"What Vela learned"** strip (credibility endpoint)
+- `frontend/src/pages/Feed.tsx` — fixtures, **"What Antroph learned"** strip (credibility endpoint)
 - `frontend/src/pages/MemoryMap.tsx` — memory visualization
 - `frontend/src/components/PredictionModal.tsx` — pick + confidence + take
 - `frontend/src/components/ShareImageModal.tsx` — share cards
@@ -147,17 +147,32 @@ Useful scripts (all read `.env` themselves):
 
 ---
 
+## 5b. Vercel deployment readiness (2026-11-07)
+
+Prepared:
+- `vercel.json` uses `routes` with a `request.path` transform, so `api/index.py` still sees `/api/health` after the rewrite. One workspace-aware `npm install` covers the root and `frontend/`.
+- Python pinned to `3.12` via `.python-version`; Node pinned to `22.x`; runtime deps pinned in `requirements.txt` and `api/requirements.txt`.
+- `AGENTMEM_URL` auto-derives from `VERCEL_URL`; `AGENTMEM_SECRET` optionally protects `/api/agentmem`.
+- Open Graph URLs use `X-Forwarded-Proto` / `APP_URL` instead of a hardcoded deployment domain.
+
+Still needed:
+1. `vercel link`, then add the env vars from README §Deploy.
+2. Deploy and run the smoke tests.
+3. Set `AGENTMEM_SECRET` in Vercel if the deployment is public.
+
+---
+
 ## 6. What remains (in priority order)
 
 1. **Seed ≥10 memories on mainnet** (currently 5). Add `scripts/seed-memories.mjs` that writes 10–15 structured memories (historical scorecards, season observations, agent identity notes) via `rememberBatch`, throttled for the relayer rate limit. **Required for Track 1.**
-2. **Tatum dashboard account ID** → submission form + README proof section.
+2. ~~**Tatum dashboard account ID**~~ ✅ `6a1070146dcffd29f3320dbd` (see §2).
 3. **Verify a Walrus write onchain through Tatum.** We have blob IDs but not the Sui tx digests; the relayer response includes `blob_id` and `job_id` only. Options: extend `lib/agent-mem.mjs` to return/relay the tx digest if the SDK exposes it (check `remember` result fields / `/api/remember/<jobId>` payload), then call `/api/tatum/verify?digest=`.
 4. **Seed a second real matchday** so `resolve` has fresh finished matches; confirm scorecards continue accumulating automatically.
-5. **Frontend pass**: open `http://localhost:5173`, verify Feed / "What Vela learned" / memory map render with the new data; fix any wallet-path regressions.
+5. **Frontend pass**: open `http://localhost:5173`, verify Feed / "What Antroph learned" / memory map render with the new data; fix any wallet-path regressions.
 6. **README/blog draft** (hackathon requires a blog post): story = memory as product, scorecard learning loop, Tatum GraphQL verification, Walrus mainnet proof.
 7. **Demo** (2–3 min): predict → resolve → scorecard recall → credibility strip.
 8. **Rotate the agent delegate key after submission** (key was pasted in chat and stored in `.env`); swap `.env` value then.
-9. **Repo hygiene**: no git on this machine (zip clone); initialize git and commit only source, never `.env`.
+9. **Repo hygiene**: git is initialized with one commit; commit source only, never `.env`.
 
 ### Open technical questions
 - Does the MemWal SDK expose the Sui tx digest for a write? If not, verification must use another anchor (e.g. blob object ID → Walrus `Blob` object via Tatum GraphQL `object(...)` by blob object ID, if the relayer exposes it).
@@ -169,6 +184,7 @@ Useful scripts (all read `.env` themselves):
 ## 7. Do-not-break list
 
 - `football-data.org v4` is the only fixture source (no Polymarket).
+- The agent namespace stays `vela-colony` — it is already written onchain; do not rename it to match the Antroph branding.
 - Scorecards are the product; keep them structured and recallable.
 - `.env` is gitignored; never print secrets in logs or docs.
 - Tatum key stays server-side; the frontend only ever calls `/api/tatum/*`.

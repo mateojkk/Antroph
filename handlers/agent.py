@@ -1,5 +1,7 @@
+import os
 import uuid
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler
 
@@ -40,6 +42,32 @@ Memory rules:
 - When you reference a memory, make it feel natural — like you just remembered, not like you queried a database."""
 
 
+def llm_settings() -> dict:
+    """gpt-oss spends the first tokens on hidden reasoning. Low effort is the
+    difference between a text back and a multi-second pause."""
+    model = os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b")
+    settings: dict = {
+        "model": model,
+        "max_tokens": 384,
+        "temperature": 0.8,
+    }
+    if "gpt-oss" in model:
+        settings["reasoning_effort"] = os.environ.get("GROQ_REASONING_EFFORT", "low")
+    return settings
+
+
+def _clip_texts(texts, limit: int = 5, chars: int = 240) -> list[str]:
+    clipped = []
+    for raw in texts[:limit]:
+        text = (raw or "").strip()
+        if not text:
+            continue
+        if len(text) > chars:
+            text = text[:chars].rstrip() + "…"
+        clipped.append(text)
+    return clipped
+
+
 def get_todays_fixtures():
     from lib.live_scores import get_upcoming_matches
     events = get_upcoming_matches()
@@ -74,75 +102,158 @@ def get_todays_fixtures():
 
 
 def _fetch_vela_record(supabase) -> dict | None:
+    """Antroph's record comes from its picks, not a public leaderboard row."""
     try:
-        lb = supabase.table("leaderboard").select("correct, total_predictions, accuracy_pct").eq("user_id", "vela").execute()
-        if lb.data:
-            r = lb.data[0]
-            return {
-                "correct": r.get("correct", 0),
-                "total": r.get("total_predictions", 0),
-                "accuracy": r.get("accuracy_pct", 0)
-            }
-    except Exception:
-        pass
-    return None
-
-
-async def build_context(memory_context: dict | None, user_email: str, conversation_history: list):
-    supabase = get_supabase()
-
-    # Try rich user select first; fall back if display_name/avatar_url
-    # columns don't exist yet.
-    email = normalize_address(user_email) or user_email
-    try:
-        user_result = (
-            supabase.table("users")
-            .select("id, username, display_name, avatar_url")
-            .ilike("email", email)
+        rows = (
+            supabase.table("predictions")
+            .select("resolved, outcome")
+            .eq("user_id", "vela")
             .execute()
-        )
-        user = user_result.data[0] if user_result.data else None
+        ).data or []
+    except Exception:
+        return None
+    if not rows:
+        return None
+    settled = [r for r in rows if r.get("resolved")]
+    correct = sum(1 for r in settled if r.get("outcome") == "correct")
+    accuracy = round((correct / len(settled) * 100), 1) if settled else 0
+    return {"correct": correct, "total": len(rows), "accuracy": accuracy}
+
+
+def _load_user(supabase, user_email: str, user_id: str | None):
+    """Profile row. Prefer the primary key when the caller already resolved it."""
+    try:
+        query = supabase.table("users").select("id, username, display_name, avatar_url")
+        if user_id:
+            user_result = query.eq("id", user_id).limit(1).execute()
+        else:
+            email = normalize_address(user_email) or user_email
+            user_result = query.ilike("email", email).limit(1).execute()
+        return user_result.data[0] if user_result.data else None
     except Exception as e:
         msg = str(e)
         if "display_name" in msg or "avatar_url" in msg or "42703" in msg:
-            user_result = (
-                supabase.table("users")
-                .select("id, username")
-                .ilike("email", email)
-                .execute()
-            )
+            query = supabase.table("users").select("id, username")
+            if user_id:
+                user_result = query.eq("id", user_id).limit(1).execute()
+            else:
+                email = normalize_address(user_email) or user_email
+                user_result = query.ilike("email", email).limit(1).execute()
             user = user_result.data[0] if user_result.data else None
             if user is not None:
                 user.setdefault("display_name", None)
                 user.setdefault("avatar_url", None)
-        else:
-            user = None
+            return user
+        return None
+
+
+def _load_record(supabase, user_id: str):
+    try:
+        lb = supabase.table("leaderboard").select("*").eq("user_id", user_id).limit(1).execute()
+        return lb.data[0] if lb.data else None
+    except Exception as e:
+        msg = str(e)
+        if "display_name" in msg or "avatar_url" in msg or "42703" in msg:
+            lb = (
+                supabase.table("leaderboard")
+                .select("user_id, username, accuracy_pct, total_predictions, correct, rank")
+                .eq("user_id", user_id)
+                .limit(1)
+                .execute()
+            )
+            return lb.data[0] if lb.data else None
+        return None
+
+
+def _load_predictions(supabase, user_id: str) -> list:
+    try:
+        r = (
+            supabase.table("predictions")
+            .select("user_pick, confidence, home_team, away_team, question, take, resolved, outcome")
+            .eq("user_id", user_id)
+            .order("created_at", desc=True)
+            .limit(20)
+            .execute()
+        )
+        return r.data or []
+    except Exception as e:
+        msg = str(e)
+        missing = any(c in msg for c in ("home_team", "away_team", "question", "take", "confidence"))
+        if missing and "42703" in msg:
+            try:
+                r = (
+                    supabase.table("predictions")
+                    .select("user_pick, resolved, outcome")
+                    .eq("user_id", user_id)
+                    .order("created_at", desc=True)
+                    .limit(20)
+                    .execute()
+                )
+                return r.data or []
+            except Exception:
+                return []
+        return []
+
+
+def _profile_bundle(supabase, user_email: str, user_id: str | None):
+    """Profile, record, picks, and Antroph's record in one round trip when we can."""
+    if not user_id:
+        user = _load_user(supabase, user_email, None)
+        user_id = (user or {}).get("id")
+        if not user_id:
+            return user, None, [], _fetch_vela_record(supabase)
+    else:
+        user = None
+
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        user_f = pool.submit(_load_user, supabase, user_email, user_id) if user is None else None
+        record_f = pool.submit(_load_record, supabase, user_id)
+        preds_f = pool.submit(_load_predictions, supabase, user_id)
+        vela_f = pool.submit(_fetch_vela_record, supabase)
+        if user_f is not None:
+            user = user_f.result()
+        return user, record_f.result(), preds_f.result(), vela_f.result()
+
+
+def _safe_live_scores() -> str:
+    try:
+        from lib.live_scores import get_live_scores_text
+        return get_live_scores_text()
+    except Exception as e:
+        print(f"[agent] Failed to fetch live scores: {e}")
+        return ""
+
+
+async def build_context(
+    memory_context: dict | None,
+    user_email: str,
+    conversation_history: list,
+    user_id: str | None = None,
+):
+    supabase = get_supabase()
+    relevant_texts = _clip_texts((memory_context or {}).get("relevant_memories", []))
+    recent_texts = _clip_texts((memory_context or {}).get("recent_memories", []))
+    failed_preds = _clip_texts((memory_context or {}).get("failed_predictions", []))
+    user_opinions = _clip_texts((memory_context or {}).get("user_opinions", []))
+
+    async def _timed(func, default, timeout=8.5):
+        try:
+            return await asyncio.wait_for(asyncio.to_thread(func), timeout)
+        except Exception as exc:
+            print(f"[agent] context fetch skipped: {exc!r}")
+            return default
+
+    # Profile queries and match data run together. Match feeds time out on
+    # their own so a slow football-data call cannot hold the reply.
+    bundle, fixtures, live_scores_text = await asyncio.gather(
+        asyncio.to_thread(_profile_bundle, supabase, user_email, user_id),
+        _timed(get_todays_fixtures, []),
+        _timed(_safe_live_scores, ""),
+    )
+    user, record, preds, vela_record = bundle
     username = (user or {}).get("username")
     display_name = (user or {}).get("display_name")
     avatar_url = (user or {}).get("avatar_url")
-    user_id = (user or {}).get("id")
-
-    record = None
-    if user_id:
-        try:
-            lb = supabase.table("leaderboard").select("*").eq("user_id", user_id).execute()
-            record = lb.data[0] if lb.data else None
-        except Exception as e:
-            msg = str(e)
-            if "display_name" in msg or "avatar_url" in msg or "42703" in msg:
-                lb = (
-                    supabase.table("leaderboard")
-                    .select("user_id, username, accuracy_pct, total_predictions, correct, rank")
-                    .eq("user_id", user_id)
-                    .execute()
-                )
-                record = lb.data[0] if lb.data else None
-
-    relevant_texts = (memory_context or {}).get("relevant_memories", [])
-    recent_texts = (memory_context or {}).get("recent_memories", [])
-    failed_preds = (memory_context or {}).get("failed_predictions", [])
-    user_opinions = (memory_context or {}).get("user_opinions", [])
-    vela_record = _fetch_vela_record(supabase)
 
     parts = []
     if display_name:
@@ -163,26 +274,6 @@ async def build_context(memory_context: dict | None, user_email: str, conversati
             f"Your (Antroph's) record: {vela_record['correct']}/{vela_record['total']} correct "
             f"({vela_record['accuracy']}% accuracy)."
         )
-    async def fetch_fixtures():
-        try:
-            return await asyncio.to_thread(get_todays_fixtures)
-        except Exception:
-            return []
-
-    async def fetch_live():
-        try:
-            import lib.live_scores
-            return await asyncio.to_thread(lib.live_scores.get_live_scores_text)
-        except Exception as e:
-            print(f"[agent] Failed to fetch live scores: {e}")
-            return ""
-
-    fixtures, live_scores_text = await asyncio.gather(
-        fetch_fixtures(),
-        fetch_live(),
-        return_exceptions=True
-    )
-    
     if isinstance(fixtures, list) and fixtures:
         lines = []
         for f in fixtures:
@@ -199,49 +290,19 @@ async def build_context(memory_context: dict | None, user_email: str, conversati
     if isinstance(live_scores_text, str) and live_scores_text:
         parts.append(live_scores_text)
 
-    if user_id:
-        try:
-            r = (
-                supabase.table("predictions")
-                .select("user_pick, confidence, home_team, away_team, question, take, resolved, outcome")
-                .eq("user_id", user_id)
-                .order("created_at", desc=True)
-                .limit(20)
-                .execute()
-            )
-            preds = r.data or []
-        except Exception as e:
-            msg = str(e)
-            missing = any(c in msg for c in ("home_team", "away_team", "question", "take", "confidence"))
-            if missing and "42703" in msg:
-                try:
-                    r = (
-                        supabase.table("predictions")
-                        .select("user_pick, resolved, outcome")
-                        .eq("user_id", user_id)
-                        .order("created_at", desc=True)
-                        .limit(20)
-                        .execute()
-                    )
-                    preds = r.data or []
-                except Exception:
-                    preds = []
-            else:
-                preds = []
-
-        if preds:
-            lines = []
-            for p in preds:
-                home = p.get("home_team") or ""
-                away = p.get("away_team") or ""
-                question = p.get("question") or ""
-                pick = p.get("user_pick") or ""
-                outcome = p.get("outcome") or ""
-                match_label = f"{home} vs {away}" if home and away else question
-                status = f"({outcome})" if outcome else "(pending)"
-                lines.append(f"- {match_label}: picked {pick} {status}")
-            if lines:
-                parts.append("User's recent predictions:\n" + "\n".join(lines))
+    if preds:
+        lines = []
+        for p in preds:
+            home = p.get("home_team") or ""
+            away = p.get("away_team") or ""
+            question = p.get("question") or ""
+            pick = p.get("user_pick") or ""
+            outcome = p.get("outcome") or ""
+            match_label = f"{home} vs {away}" if home and away else question
+            status = f"({outcome})" if outcome else "(pending)"
+            lines.append(f"- {match_label}: picked {pick} {status}")
+        if lines:
+            parts.append("User's recent predictions:\n" + "\n".join(lines))
     if failed_preds:
         parts.append("User's failed predictions (use these for roasting):\n" + "\n".join(f"- {t}" for t in failed_preds[:5]))
     if user_opinions:
@@ -252,10 +313,14 @@ async def build_context(memory_context: dict | None, user_email: str, conversati
         parts.append("Recent memories from past chats:\n" + "\n".join(f"- {t}" for t in recent_texts[:10]))
     if conversation_history:
         recent = conversation_history[-6:]
-        parts.append(
-            "Recent conversation:\n"
-            + "\n".join(f"{'User' if m['role'] == 'user' else 'Antroph'}: {m['content']}" for m in recent)
-        )
+        lines = []
+        for m in recent:
+            content = (m.get("content") or "").strip()
+            if len(content) > 400:
+                content = content[:400].rstrip() + "…"
+            who = "User" if m.get("role") == "user" else "Antroph"
+            lines.append(f"{who}: {content}")
+        parts.append("Recent conversation:\n" + "\n".join(lines))
 
     if not parts:
         parts.append(f"The user is authenticated as {user_email}. They exist but profile data is still loading.")
@@ -332,39 +397,31 @@ class handler(BaseHTTPRequestHandler):
             send_json(self, 404, {"error": "User not found"})
             return
 
-        # Resolve session: create if missing, load history from DB (server is source of truth).
+        # Resolve session. The open chat already sent its recent turns, so
+        # don't read the whole thread back before answering.
         created_session = False
         title = None
-        if session_id:
-            history = _load_session_history(supabase, session_id, user_id)
-            if not history and not _session_exists(supabase, session_id, user_id):
-                # Invalid session id — create a new one.
-                session_id = str(uuid.uuid4())
-                title = auto_title(message)
-                supabase.table("chat_sessions").insert({
-                    "id": session_id, "user_id": user_id, "title": title
-                }).execute()
-                created_session = True
-                history = []
-        else:
+        history: list = []
+        if session_id and not _session_exists(supabase, session_id, user_id):
+            session_id = None
+        if not session_id:
             session_id = str(uuid.uuid4())
             title = auto_title(message)
             supabase.table("chat_sessions").insert({
                 "id": session_id, "user_id": user_id, "title": title
             }).execute()
             created_session = True
-            history = []
+        elif not client_history:
+            history = _load_session_history(supabase, session_id, user_id)
 
-        # Prefer DB history; fall back to client history if DB is empty (e.g. just-created session).
-        conversation_history = history if history else client_history
+        # The client already has the thread. Skip the full history read when it sent one.
+        conversation_history = (client_history or history or [])[-10:]
 
-        # Build context with a hard timeout so the user never waits forever.
         try:
-            context_block = await asyncio.wait_for(
-                build_context(memory_context, user_email, conversation_history),
-                timeout=8.0,
+            context_block = await build_context(
+                memory_context, user_email, conversation_history, user_id=user_id
             )
-        except (asyncio.TimeoutError, Exception) as ctx_err:
+        except Exception as ctx_err:
             print(f"[agent] context build failed: {ctx_err!r}")
             context_block = (
                 f"The user is authenticated as {user_email}. "
@@ -376,13 +433,11 @@ class handler(BaseHTTPRequestHandler):
         try:
             response = await asyncio.to_thread(
                 groq.chat.completions.create,
-                model=os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b"),
                 messages=[
                     {"role": "system", "content": SYSTEM_PROMPT + "\n\n" + context_block},
                     {"role": "user", "content": message},
                 ],
-                max_tokens=512,
-                temperature=0.8,
+                **llm_settings(),
             )
             reply = response.choices[0].message.content
             if not isinstance(reply, str) or not reply.strip():

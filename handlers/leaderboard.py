@@ -1,6 +1,7 @@
 from http.server import BaseHTTPRequestHandler
 
 from lib.common import get_supabase, send_json
+from lib.players import public_players
 
 
 def _safe_select(supabase) -> list[dict]:
@@ -72,11 +73,37 @@ def _enrich_with_users(supabase, rows: list[dict]) -> list[dict]:
     return rows
 
 
+def _emails_by_id(supabase, rows: list[dict]) -> dict:
+    ids = [r["user_id"] for r in rows if r.get("user_id")]
+    if not ids:
+        return {}
+    try:
+        result = (
+            supabase.table("users")
+            .select("id, email")
+            .in_("id", ids)
+            .execute()
+        )
+        return {u["id"]: u.get("email") for u in (result.data or [])}
+    except Exception as e:
+        print(f"[leaderboard] email lookup failed: {e}")
+        return {}
+
+
+def _with_public_ranks(rows: list[dict]) -> list[dict]:
+    ordered = sorted(rows, key=lambda r: (r.get("rank") is None, r.get("rank") or 0))
+    for i, row in enumerate(ordered, start=1):
+        row["rank"] = i
+    return ordered
+
+
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
         try:
             supabase = get_supabase()
             rows = _safe_select(supabase)
+            rows = public_players(rows, _emails_by_id(supabase, rows))
+            rows = _with_public_ranks(rows)
             rows = _enrich_with_users(supabase, rows)
             send_json(self, 200, rows)
         except Exception as e:

@@ -2,12 +2,20 @@
   "name": "antroph",
   "version": "0.1.0",
   "private": true,
-  "dependencies": {
-    "@mysten-incubation/memwal": "^0.1.12"
+  "workspaces": [
+    "frontend",
+    "packages/agent-mem",
+    "services/agentmem"
+  ],
+  "engines": {
+    "node": "22.x"
   },
   "scripts": {
     "dev": "node dev.mjs",
-    "build": "cd frontend && npm run build",
-    "preview": "cd frontend && npm run preview"
+    "dev:vercel": "vercel dev",
+    "dev:web": "npm run dev --workspace frontend",
+    "build": "npm run build --workspace frontend",
+    "preview": "npm run preview --workspace frontend",
+    "lint": "npm run lint --workspace frontend"
   }
 }

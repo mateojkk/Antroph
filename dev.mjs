@@ -42,7 +42,19 @@ if (existsSync(envPath)) {
 console.log("\x1b[36m[antroph]\x1b[0m Starting Vite frontend...");
 // Run Vite's JS entry directly through Node. Avoids npx/.cmd spawn quirks on
 // Windows (spaces in "Program Files" + shell quoting) and works cross-platform.
-const VITE_JS = resolvePath(FRONTEND_DIR, "node_modules", "vite", "bin", "vite.js");
+// npm workspaces hoist vite to the root node_modules, so check both locations.
+const VITE_JS =
+  [
+    resolvePath(FRONTEND_DIR, "node_modules", "vite", "bin", "vite.js"),
+    resolvePath(__dirname, "node_modules", "vite", "bin", "vite.js"),
+  ].find((candidate) => existsSync(candidate)) || null;
+
+if (!VITE_JS) {
+  console.error(
+    "\x1b[31m[antroph]\x1b[0m vite not found. Run `npm install` at the repo root first."
+  );
+  process.exit(1);
+}
 const vite = spawn(process.execPath, [VITE_JS, "--port", String(VITE_PORT), "--force"], {
   cwd: FRONTEND_DIR,
   stdio: "pipe",

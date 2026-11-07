@@ -29,7 +29,13 @@ from lib.common import (
     options,
     normalize_address,
 )
-from handlers.agent import build_context, auto_title, _session_exists, _load_session_history
+from handlers.agent import (
+    SYSTEM_PROMPT,
+    build_context,
+    auto_title,
+    llm_settings,
+    _session_exists,
+)
 
 
 def _sse(data: dict) -> bytes:
@@ -91,44 +97,44 @@ class handler(BaseHTTPRequestHandler):
             self._error(404, "User not found")
             return
 
-        # Resolve / create session.
-        title = None
-        created_session = False
-        if session_id:
-            history = _load_session_history(supabase, session_id, user_id)
-            if not history and not _session_exists(supabase, session_id, user_id):
-                session_id = str(uuid.uuid4())
-                title = auto_title(message)
-                supabase.table("chat_sessions").insert(
-                    {"id": session_id, "user_id": user_id, "title": title}
-                ).execute()
-                created_session = True
-                history = []
-        else:
-            session_id = str(uuid.uuid4())
-            title = auto_title(message)
-            supabase.table("chat_sessions").insert(
-                {"id": session_id, "user_id": user_id, "title": title}
-            ).execute()
-            created_session = True
-            history = []
+        # Session bookkeeping and the prompt context are independent.
+        # The browser already sent the recent turns, so skip the history read.
+        async def resolve_session():
+            def _resolve():
+                sid = session_id
+                title = None
+                if sid and not _session_exists(supabase, sid, user_id):
+                    sid = None
+                if not sid:
+                    sid = str(uuid.uuid4())
+                    title = auto_title(message)
+                    supabase.table("chat_sessions").insert(
+                        {"id": sid, "user_id": user_id, "title": title}
+                    ).execute()
+                return sid, title
 
-        conversation_history = history if history else client_history
+            return await asyncio.to_thread(_resolve)
 
-        # Build context (same as non-streaming handler).
-        try:
-            context_block = await asyncio.wait_for(
-                build_context(memory_context, user_email, conversation_history),
-                timeout=8.0,
-            )
-        except Exception as ctx_err:
-            print(f"[agent_stream] context build failed: {ctx_err!r}")
-            context_block = (
-                f"The user is authenticated as {user_email}. "
-                "No additional context could be loaded."
-            )
+        async def load_context():
+            try:
+                return await build_context(
+                    memory_context,
+                    user_email,
+                    (client_history or [])[-10:],
+                    user_id=user_id,
+                )
+            except Exception as ctx_err:
+                print(f"[agent_stream] context build failed: {ctx_err!r}")
+                return (
+                    f"The user is authenticated as {user_email}. "
+                    "No additional context could be loaded."
+                )
 
-        from handlers.agent import SYSTEM_PROMPT
+        (session_id, title), context_block = await asyncio.gather(
+            resolve_session(),
+            load_context(),
+        )
+
         groq = get_groq()
 
         # Start SSE response headers.
@@ -149,14 +155,12 @@ class handler(BaseHTTPRequestHandler):
         try:
             stream = await asyncio.to_thread(
                 groq.chat.completions.create,
-                model=os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b"),
                 messages=[
                     {"role": "system", "content": SYSTEM_PROMPT + "\n\n" + context_block},
                     {"role": "user", "content": message},
                 ],
-                max_tokens=512,
-                temperature=0.8,
                 stream=True,
+                **llm_settings(),
             )
 
             for chunk in stream:

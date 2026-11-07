@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler
 
 from lib.common import get_supabase, send_json, require_auth_email, read_json_body, normalize_address, find_user_id
+from lib.players import is_real_player
 
 
 class handler(BaseHTTPRequestHandler):
@@ -141,44 +142,26 @@ class handler(BaseHTTPRequestHandler):
                         "resolved": False,
                         "outcome": None,
                     }).execute()
-
-                    # Initialize Vela's leaderboard entry if missing, or increment
-                    vela_lb = supabase.table("leaderboard").select("total_predictions").eq("user_id", "vela").execute()
-                    if not vela_lb.data:
-                        supabase.table("leaderboard").insert({
-                            "user_id": "vela",
-                            "username": "antroph",
-                            "display_name": "Antroph",
-                            "total_predictions": 1,
-                            "correct": 0,
-                            "accuracy_pct": 0,
-                            "rank": 999,
-                        }).execute()
-                    else:
-                        v_total = vela_lb.data[0]["total_predictions"] + 1
-                        supabase.table("leaderboard").update({
-                            "total_predictions": v_total,
-                            "username": "antroph",
-                            "display_name": "Antroph",
-                        }).eq("user_id", "vela").execute()
                 except Exception as e:
                     print(f"Failed to track Vela's prediction: {e}")
 
-            current = supabase.table("leaderboard").select("total_predictions").eq("user_id", user_id).execute()
-            if not current.data:
-                user_info = supabase.table("users").select("username").eq("id", user_id).execute()
-                username_val = user_info.data[0]["username"] if user_info.data else ""
-                supabase.table("leaderboard").insert({
-                    "user_id": user_id,
-                    "username": username_val,
-                    "total_predictions": 1,
-                    "correct": 0,
-                    "accuracy_pct": 0,
-                    "rank": 999,
-                }).execute()
-            else:
-                total = current.data[0]["total_predictions"] + 1
-                supabase.table("leaderboard").update({"total_predictions": total}).eq("user_id", user_id).execute()
+            # House account and test users keep their picks, but they are not players.
+            if is_real_player(user_id, None, user_email):
+                current = supabase.table("leaderboard").select("total_predictions").eq("user_id", user_id).execute()
+                if not current.data:
+                    user_info = supabase.table("users").select("username").eq("id", user_id).execute()
+                    username_val = user_info.data[0]["username"] if user_info.data else ""
+                    supabase.table("leaderboard").insert({
+                        "user_id": user_id,
+                        "username": username_val,
+                        "total_predictions": 1,
+                        "correct": 0,
+                        "accuracy_pct": 0,
+                        "rank": 999,
+                    }).execute()
+                else:
+                    total = current.data[0]["total_predictions"] + 1
+                    supabase.table("leaderboard").update({"total_predictions": total}).eq("user_id", user_id).execute()
 
             send_json(self, 201, {
                 "status": "ok",

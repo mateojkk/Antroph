@@ -1,8 +1,51 @@
 import os
-import urllib.request
 import json
+import tempfile
+import time
+import urllib.request
+
+# Each local API call is a new process, so the cache lives on disk.
+# A fresh football-data fetch is slow; the next replies reuse it.
+_CACHE: dict[str, tuple[float, object]] = {}
+_LIVE_TTL = 30.0
+_FIXTURE_TTL = 120.0
+_FETCH_TIMEOUT = 8.0
+
+
+def _cache_file(key: str) -> str:
+    return os.path.join(tempfile.gettempdir(), f"antroph-scores-{key}.json")
+
+
+def _cached(key: str, ttl: float, loader):
+    now = time.time()
+    hit = _CACHE.get(key)
+    if hit and now - hit[0] < ttl:
+        return hit[1]
+    path = _cache_file(key)
+    try:
+        with open(path, encoding="utf-8") as f:
+            payload = json.load(f)
+        age = now - float(payload["stored_at"])
+        if age < ttl:
+            _CACHE[key] = (payload["stored_at"], payload["value"])
+            return payload["value"]
+    except Exception:
+        pass
+    value = loader()
+    _CACHE[key] = (now, value)
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump({"stored_at": now, "value": value}, f)
+    except Exception as e:
+        print(f"[live_scores] cache write failed: {e}")
+    return value
+
 
 def get_live_scores_text() -> str:
+    return _cached("live", _LIVE_TTL, _fetch_live_scores_text)
+
+
+def _fetch_live_scores_text() -> str:
     api_key = os.environ.get("FOOTBALL_DATA_API_KEY")
     if not api_key:
         return ""
@@ -12,7 +55,7 @@ def get_live_scores_text() -> str:
             "https://api.football-data.org/v4/matches",
             headers={"X-Auth-Token": api_key}
         )
-        with urllib.request.urlopen(req, timeout=5) as response:
+        with urllib.request.urlopen(req, timeout=_FETCH_TIMEOUT) as response:
             data = json.loads(response.read().decode())
         
         matches = data.get("matches", [])
@@ -40,7 +83,8 @@ def get_live_scores_text() -> str:
         
         return "Live Match Updates & Scores (Use this to answer questions about ongoing/finished games):\n" + "\n".join(lines)
     except Exception as e:
-        return ""
+        print(f"[live_scores] live fetch failed: {e}")
+        raise
 
 def _normalize_team(name: str) -> str:
     import re
@@ -104,6 +148,10 @@ def get_finished_matches() -> dict:
 
 def get_upcoming_matches() -> list:
     """Returns a list of raw match objects for the next 7 days from football-data.org."""
+    return _cached("upcoming", _FIXTURE_TTL, _fetch_upcoming_matches)
+
+
+def _fetch_upcoming_matches() -> list:
     api_key = os.environ.get("FOOTBALL_DATA_API_KEY")
     if not api_key:
         return []
@@ -118,7 +166,7 @@ def get_upcoming_matches() -> list:
             url,
             headers={"X-Auth-Token": api_key}
         )
-        with urllib.request.urlopen(req, timeout=8) as response:
+        with urllib.request.urlopen(req, timeout=_FETCH_TIMEOUT) as response:
             data = json.loads(response.read().decode())
 
         matches = data.get("matches", [])
@@ -132,9 +180,9 @@ def get_upcoming_matches() -> list:
             "https://api.football-data.org/v4/matches",
             headers={"X-Auth-Token": api_key}
         )
-        with urllib.request.urlopen(req, timeout=8) as response:
+        with urllib.request.urlopen(req, timeout=_FETCH_TIMEOUT) as response:
             data = json.loads(response.read().decode())
         return data.get("matches", [])
     except Exception as e:
         print(f"[live_scores] get_upcoming_matches fallback failed: {e}")
-        return []
+        raise

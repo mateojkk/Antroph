@@ -83,7 +83,13 @@ MemWal account model: each connected wallet owns its own `MemWalAccount` on-chai
 vercel --prod
 ```
 
-Vercel routing: `/api/(.*)` → `/api/index.py` (single function in `api/` that dispatches to modules in `handlers/`), all other paths → `index.html` for the React SPA. Vercel serves static files from `frontend/dist` automatically before applying rewrites. The daily match-resolution cron hits `/api/resolve` (Hobby plan limit).
+This repo is an npm workspaces monorepo (`frontend/`, `packages/agent-mem/`, `services/agentmem/`). Root `vercel.json` uses **Vercel Services**:
+
+- **frontend** — Vite app (`/`)
+- **api** — Python `api/index.py` + `api/agent_stream.py` (`/api/*`), binds to **agentmem** via `AGENTMEM_URL`
+- **agentmem** — internal only (Walrus scorecard writes/recall); not on a public rewrite
+
+Local stack: `npm run dev` (`dev.mjs`). Multi-service local routing: `npm run dev:vercel` (`vercel dev`). Cron: `/api/resolve` daily.
 
 ## Validation
 

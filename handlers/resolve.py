@@ -11,7 +11,7 @@ import asyncio
 import math
 from http.server import BaseHTTPRequestHandler
 
-from lib.common import get_supabase, send_json
+from lib.common import get_supabase, send_json, agentmem_headers, agentmem_request_url
 
 
 def _wilson_score(correct: int, total: int, z: float = 1.96) -> float:
@@ -152,7 +152,7 @@ def _write_scorecards(scorecards: list[dict]) -> dict:
     import json
     import urllib.request
 
-    base = (os.environ.get("AGENTMEM_URL") or "http://localhost:3000/api/agentmem").rstrip("/")
+    base = agentmem_request_url()
     max_memories = int(os.environ.get("AGENTMEM_MAX_WRITES", "10"))
     texts = [_scorecard_text(s) for s in scorecards[:max_memories]]
     if not texts:
@@ -162,7 +162,7 @@ def _write_scorecards(scorecards: list[dict]) -> dict:
     req = urllib.request.Request(
         base,
         data=payload,
-        headers={"Content-Type": "application/json"},
+        headers=agentmem_headers(),
         method="POST",
     )
     try:
@@ -176,17 +176,26 @@ def _write_scorecards(scorecards: list[dict]) -> dict:
 
 
 def _refresh_ranks(supabase):
-    """Re-rank all leaderboard rows by Wilson score desc, ties broken by
-    total_predictions desc (more skin in the game wins)."""
+    """Re-rank public players by Wilson score desc, ties broken by
+    total_predictions desc (more skin in the game wins).
+
+    The house account and test users are pushed off the board.
+    """
+    from lib.players import public_players
+
     rows = (
         supabase.table("leaderboard")
-        .select("user_id, rank_score, total_predictions")
+        .select("user_id, username, rank_score, total_predictions")
         .order("rank_score", desc=True)
         .order("total_predictions", desc=True)
         .execute()
-    )
-    for i, entry in enumerate(rows.data or []):
+    ).data or []
+    visible = public_players(rows)
+    hidden = [entry for entry in rows if entry not in visible]
+    for i, entry in enumerate(visible):
         supabase.table("leaderboard").update({"rank": i + 1}).eq("user_id", entry["user_id"]).execute()
+    for entry in hidden:
+        supabase.table("leaderboard").update({"rank": 999}).eq("user_id", entry["user_id"]).execute()
 
 
 class handler(BaseHTTPRequestHandler):

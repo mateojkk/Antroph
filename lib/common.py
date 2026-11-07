@@ -100,6 +100,43 @@ def find_user_id(supabase, email: str) -> str | None:
     return r.data[0]["id"] if r.data else None
 
 
+def agentmem_url() -> str:
+    """Base URL for the agentmem service (binding-injected in production).
+
+    Do not set ``AGENTMEM_URL`` on Vercel when the api→agentmem service binding
+    is configured. For local ``node dev.mjs``, use the legacy public path.
+    """
+    explicit = (os.environ.get("AGENTMEM_URL") or "").strip()
+    if explicit:
+        return explicit.rstrip("/")
+    return "http://localhost:3000/api/agentmem"
+
+
+def agentmem_request_url() -> str:
+    """Full URL for POST/GET to the agent-memory handler.
+
+    Local dev still exposes ``/api/agentmem`` on the dev server. The internal
+    agentmem service binding points at the service root.
+    """
+    base = agentmem_url()
+    if base.endswith("/api/agentmem"):
+        return base
+    return base + "/" if not base.endswith("/") else base
+
+
+def agentmem_headers() -> dict[str, str]:
+    """Headers for calling the agent-memory route.
+
+    Adds the shared secret when ``AGENTMEM_SECRET`` is configured so the public
+    deployment does not expose an unauthenticated write endpoint.
+    """
+    headers = {"Content-Type": "application/json"}
+    secret = (os.environ.get("AGENTMEM_SECRET") or "").strip()
+    if secret:
+        headers["x-agentmem-key"] = secret
+    return headers
+
+
 def get_auth_email(handler: BaseHTTPRequestHandler) -> str | None:
     raw = handler.headers.get("X-User-Email", "")
     if isinstance(raw, str):

@@ -1,35 +1,29 @@
 /**
- * Vercel serverless entry: Vela project-agent memory ops.
- *
- * POST /api/agentmem
- *   { op: "remember", text: "..." }            -> accepted job (background write)
- *   { op: "remember", text, waitFor: true }    -> awaited Walrus upload (slow, ~45s)
- *   { op: "recall", query: "...", limit: 10 }  -> wormhole recall from agent memory
- *
- * GET /api/agentmem
- *   -> configuration status for the health check
- *
- * This route never takes a namespace or account id from the request: the agent
- * signs with its own delegate key against its own account, so nothing the
- * caller sends can redirect a write into someone else's memory.
+ * Internal agent-memory service (Walrus scorecards). Not exposed on the public
+ * `/api/agentmem` path when using Vercel Services; the `api` service calls this
+ * over the AGENTMEM_URL binding.
  */
 
-import { agentRemember, agentRememberAndWait, agentRecall, agentRememberBulk, agentConfigStatus } from "../lib/agent-mem.mjs";
-
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
-  "Content-Type": "application/json",
-};
+import {
+  agentRemember,
+  agentRememberAndWait,
+  agentRecall,
+  agentRememberBulk,
+  agentConfigStatus,
+} from "@antroph/agent-mem";
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-agentmem-key");
 
   if (req.method === "OPTIONS") {
     return respond(res, 204, null);
+  }
+
+  const secret = (process.env.AGENTMEM_SECRET || "").trim();
+  if (secret && req.headers["x-agentmem-key"] !== secret) {
+    return respond(res, 401, { error: "Unauthorized" });
   }
 
   const status = agentConfigStatus();

@@ -8,6 +8,7 @@ The page is also a real HTML doc with a meta refresh redirect to the SPA,
 so the user lands on the right page if they click the link.
 """
 
+import os
 import re
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
@@ -21,9 +22,14 @@ APP_TAGLINE = "Your AI football rival, all season"
 def _app_url(handler: BaseHTTPRequestHandler) -> str:
     host = handler.headers.get("Host", "")
     if host:
-        proto = "https" if "vercel" in host else "http"
+        proto = handler.headers.get("X-Forwarded-Proto") or "https"
         return f"{proto}://{host}"
-    return "https://vela-wc.vercel.app"
+    fallback = (
+        os.environ.get("APP_URL")
+        or os.environ.get("VERCEL_PROJECT_PRODUCTION_URL")
+        or "antroph.vercel.app"
+    ).rstrip("/")
+    return fallback if fallback.startswith("http") else f"https://{fallback}"
 
 
 def _html(title: str, description: str, image: str | None, target_url: str) -> bytes:
