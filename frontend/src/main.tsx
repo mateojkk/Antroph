@@ -35,7 +35,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         defaultNetwork={network}
         createClient={(name) => createBrowserSuiClient(name)}
       >
-        <WalletProvider autoConnect>
+        <WalletProvider storageKey="antroph-dappkit">
           <App />
         </WalletProvider>
       </SuiClientProvider>

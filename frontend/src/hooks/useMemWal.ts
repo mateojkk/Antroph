@@ -11,7 +11,7 @@ import {
 } from "@mysten-incubation/memwal/account";
 import type { SuiJsonRpcClient } from "@mysten/sui/jsonRpc";
 import { Transaction } from "@mysten/sui/transactions";
-import { apiGet, apiPatch, apiPost } from "../lib/api";
+import { apiGet, apiPatch } from "../lib/api";
 import { findMemWalAccountId } from "../lib/suiClient";
 import { useAuth } from "./useAuth";
 
@@ -214,21 +214,11 @@ export interface UseMemWalResult {
 export function useMemWal(): UseMemWalResult {
   const account = useCurrentAccount();
   const address = account?.address;
-  // The wallet signs; Vela broadcasts through Tatum GraphQL. This keeps the
-  // browser off Sui's sunset public JSON-RPC fullnode (and its CORS block).
+  // Poll tx status via our read-only /api/sui/tx proxy (no JSON-RPC from the browser).
   const txClient = useMemo(memwalTxClient, []);
-  const { mutateAsync: signAndExecuteTransaction } = useSignAndExecuteTransaction({
-    execute: async ({ bytes, signature }) => {
-      const result = await apiPost<{ digest?: string; error?: string }>(
-        "/sui/execute",
-        { bytes, signature }
-      );
-      if (!result?.digest) {
-        throw new Error(result?.error ?? "Tatum returned no transaction digest");
-      }
-      return { digest: result.digest };
-    },
-  });
+  // Let the wallet sign and broadcast (People Book pattern). A custom execute hook
+  // that POSTs signed bytes to our origin looks like a drainer relay to Slush.
+  const { mutateAsync: signAndExecuteTransaction } = useSignAndExecuteTransaction();
   const { mutateAsync: signPersonalMessage } = useSignPersonalMessage();
   const { user } = useAuth();
 
