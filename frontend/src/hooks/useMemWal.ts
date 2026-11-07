@@ -204,28 +204,23 @@ export function useMemWal(): UseMemWalResult {
 
   useEffect(() => {
     if (!address) return;
-    let cancelled = false;
-    getOrCreateDelegate(address).then((d) => {
-      if (cancelled) return;
-      setDelegate(d);
+    // Load a key the user already granted. Do not generate one here: minting a
+    // private key the moment a wallet connects is the pattern Slush reads as a
+    // standing delegate. People Book only creates the key when the user starts
+    // the grant.
+    const existing = loadDelegate(address);
+    setDelegate(existing);
 
-      // Prefer localStorage, fall back to Supabase profile, then write back to localStorage.
-      let storedAccountId = loadAccountId(address);
-      if (!storedAccountId && user?.memwal_account_id) {
-        storedAccountId = user.memwal_account_id;
-        saveAccountId(address, storedAccountId);
-      }
-      setAccountId(storedAccountId);
+    let storedAccountId = loadAccountId(address);
+    if (!storedAccountId && user?.memwal_account_id) {
+      storedAccountId = user.memwal_account_id;
+      saveAccountId(address, storedAccountId);
+    }
+    setAccountId(storedAccountId);
 
-      // Only consider ourselves authorized if the localStorage flag, delegate key,
-      // and account ID are all present. Otherwise force re-authorization.
-      const marked = isMarkedAuthorized(address);
-      const canAuthorize = !!(storedAccountId && d);
-      setAuthorized(marked && canAuthorize ? true : marked ? false : null);
-    });
-    return () => {
-      cancelled = true;
-    };
+    const marked = isMarkedAuthorized(address);
+    const canAuthorize = !!(storedAccountId && existing);
+    setAuthorized(marked && canAuthorize ? true : marked ? false : null);
   }, [address, user?.memwal_account_id]);
 
   const memwal = useMemo(() => {
@@ -267,10 +262,8 @@ export function useMemWal(): UseMemWalResult {
       setError("Wallet not connected");
       return;
     }
-    if (!delegate) {
-      setError("Delegate key not ready");
-      return;
-    }
+    const activeDelegate = delegate ?? (await getOrCreateDelegate(address));
+    if (!delegate) setDelegate(activeDelegate);
     if (!walletSigner) {
       setError("Wallet signer not ready");
       return;
@@ -351,7 +344,7 @@ export function useMemWal(): UseMemWalResult {
       }
 
       setStatus("Authorizing this device…");
-      const pkBytes = hexToBytes(delegate.publicKey);
+      const pkBytes = hexToBytes(activeDelegate.publicKey);
       // The published contract is add_delegate_key(account, registry, key, label, clock).
       // memwal 0.0.7 still passes the key as the second argument, which the chain
       // rejects as InvalidUsageOfPureArg.
