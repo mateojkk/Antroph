@@ -65,7 +65,6 @@
         "service": "api"
       }
     },
-    { "handle": "filesystem" },
     {
       "source": "/((?!api/).*)",
       "destination": {
