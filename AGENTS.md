@@ -86,7 +86,8 @@ vercel --prod
 This repo is an npm workspaces monorepo (`frontend/`, `packages/agent-mem/`, `services/agentmem/`). Root `vercel.json` uses **Vercel Services**:
 
 - **frontend** — Vite app (`/`)
-- **api** — Python `api/index.py` + `api/agent_stream.py` (`/api/*`), binds to **agentmem** via `AGENTMEM_URL`
+- **api** — Python `api/index.py` (`/api/*` except stream), binds to **agentmem** via `AGENTMEM_URL`
+- **api-stream** — Python `api/agent_stream.py` (`/api/agent_stream`, unbuffered SSE)
 - **agentmem** — internal only (Walrus scorecard writes/recall); not on a public rewrite
 
 Local stack: `npm run dev` (`dev.mjs`). Multi-service local routing: `npm run dev:vercel` (`vercel dev`). Cron: `/api/resolve` daily.

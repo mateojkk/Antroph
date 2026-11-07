@@ -10,16 +10,12 @@
     },
     "api": {
       "root": ".",
-      "runtime": "python",
+      "entrypoint": "api/index.py",
       "installCommand": "pip install -r api/requirements.txt",
       "functions": {
         "api/index.py": {
           "maxDuration": 60,
-          "excludeFiles": "{frontend/**,node_modules/**,venv/**,scripts/**,supabase/**,.git/**}"
-        },
-        "api/agent_stream.py": {
-          "maxDuration": 60,
-          "excludeFiles": "{frontend/**,node_modules/**,venv/**,scripts/**,supabase/**,.git/**}"
+          "excludeFiles": "{frontend/**,node_modules/**,venv/**,scripts/**,supabase/**,.git/**,services/**,packages/**}"
         }
       },
       "bindings": [
@@ -30,6 +26,17 @@
           "env": "AGENTMEM_URL"
         }
       ]
+    },
+    "api-stream": {
+      "root": ".",
+      "entrypoint": "api/agent_stream.py",
+      "installCommand": "pip install -r api/requirements.txt",
+      "functions": {
+        "api/agent_stream.py": {
+          "maxDuration": 60,
+          "excludeFiles": "{frontend/**,node_modules/**,venv/**,scripts/**,supabase/**,.git/**,services/**,packages/**}"
+        }
+      }
     },
     "agentmem": {
       "root": "services/agentmem",
@@ -45,7 +52,7 @@
     {
       "source": "/api/agent_stream",
       "destination": {
-        "service": "api"
+        "service": "api-stream"
       }
     },
     {
