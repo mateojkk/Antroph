@@ -16,7 +16,7 @@
   z-index: -1;
   inset: 0 auto 0 0;
   width: 54%;
-  background: radial-gradient(ellipse at 35% 45%, #a78bfa13, transparent 65%);
+  background: radial-gradient(ellipse at 50% 50%, #a78bfa13, transparent 65%);
   content: "";
   pointer-events: none;
 }
@@ -55,16 +55,13 @@
 @media (max-width: 760px) {
   .login-page { padding-inline: 24px; }
   .login-header { height: 72px; }
-  .login-layout { width: min(440px, 100%); min-height: auto; grid-template-columns: 1fr; gap: 30px; padding: 45px 0; }
-  .login-story h1 { font-size: clamp(56px, 12vw, 76px); }
-  .login-lede { margin-top: 16px; }
+  .login-layout { width: 100%; min-height: auto; grid-template-columns: minmax(0, 410px); padding: 45px 0; }
   .login-card { padding: 24px; }
 }
 @media (max-width: 390px) {
   .login-page { padding-inline: 18px; }
   .login-back { font-size: 10px; }
   .login-card { padding: 20px; }
-  .login-story h1 { font-size: 54px; }
   .login-footer { font-size: 9px; }
 }
 @media (prefers-reduced-motion: reduce) {

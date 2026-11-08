@@ -25,27 +25,19 @@ export default function Login() {
       </header>
 
       <div className="login-layout">
-        <section className="login-story" aria-labelledby="login-title">
-          <p className="login-eyebrow"><span className="login-live-dot" /> YOUR RIVAL REMEMBERS</p>
-          <h1 id="login-title">Talk football.<br /><span>Leave receipts.</span></h1>
-          <p className="login-lede">Connect your wallet to get in the game.</p>
-        </section>
-
         <section id="login-connect" className="login-card" aria-labelledby="connect-title">
           <div className="login-card-brand"><img src="/antroph.jpg" alt="" /><span>ANTROPH / SUI MAINNET</span></div>
-          <p className="login-card-kicker">SUI MAINNET</p>
-          <h2 id="connect-title">You in?</h2>
-          <p className="login-card-copy">Connect a Sui wallet to meet your football rival.</p>
-
+          <p className="login-card-kicker">FIRST, PICK YOUR SIDE.</p>
+          <h1 id="connect-title">Connect your wallet.</h1>
+          <p className="login-card-copy">Your Sui wallet is your ticket in.</p>
           <div className="login-connect-button">
             <ConnectButton className="antroph-connect-button">Connect Sui Wallet</ConnectButton>
           </div>
-
-          <div className="login-gas-note"><span aria-hidden="true">◈</span><p>Memory setup uses a small amount of SUI for gas.</p></div>
+          <div className="login-gas-note"><span aria-hidden="true">?</span><p>Memory setup uses a small amount of SUI for gas.</p></div>
         </section>
       </div>
 
-      <footer className="login-footer"><span>Football ends. The conversation doesn't.</span><Link to="/about">More about Antroph <span aria-hidden="true">↗</span></Link></footer>
+      <footer className="login-footer"><span>Football ends. The conversation doesn't.</span><Link to="/about">Meet Antroph <span aria-hidden="true">↗</span></Link></footer>
     </main>
   );
 }
