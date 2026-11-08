@@ -19,7 +19,7 @@ export default function Login() {
       <header className="login-header">
         <Link to="/" className="login-brand" aria-label="Antroph home">
           <img src="/antroph.jpg" alt="" />
-          <span>antroph</span><i aria-hidden="true">✳</i>
+          <span>antroph</span><span className="brand-dot" aria-hidden="true">®</span>
         </Link>
         <Link to="/" className="login-back">Back to home <span aria-hidden="true">↗</span></Link>
       </header>
