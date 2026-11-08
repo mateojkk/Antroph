@@ -1,44 +1,44 @@
 @import "tailwindcss";
 
 @theme {
-  /* Greyscale base */
-  --color-background: #0a0a0a;
-  --color-foreground: #fafafa;
-  --color-card: #171717;
-  --color-card-foreground: #fafafa;
-  --color-popover: #171717;
-  --color-popover-foreground: #fafafa;
-  --color-muted: #262626;
-  --color-muted-foreground: #a3a3a3;
-  --color-border: #262626;
-  --color-input: #262626;
-  --color-secondary: #262626;
-  --color-secondary-foreground: #fafafa;
-  --color-accent: #262626;
-  --color-accent-foreground: #fafafa;
+  /* Black and white foundation with quiet, layered surfaces. */
+  --color-background: #080808;
+  --color-foreground: #ffffff;
+  --color-card: #141414;
+  --color-card-foreground: #ffffff;
+  --color-popover: #141414;
+  --color-popover-foreground: #ffffff;
+  --color-muted: #292929;
+  --color-muted-foreground: #b0b0b0;
+  --color-border: #292929;
+  --color-input: #292929;
+  --color-secondary: #292929;
+  --color-secondary-foreground: #ffffff;
+  --color-accent: #24202e;
+  --color-accent-foreground: #ffffff;
 
-  /* Green accent */
-  --color-primary: #00DD94;
-  --color-primary-foreground: #0a0a0a;
-  --color-ring: #00DD94;
+  /* White primary actions; color reserved for context and status. */
+  --color-primary: #ffffff;
+  --color-primary-foreground: #080808;
+  --color-ring: #a78bfa;
 
   /* Status */
-  --color-destructive: #ef4444;
-  --color-success: #34d399;
-  --color-warning: #fbbf24;
-  --color-danger: #f87171;
+  --color-destructive: #fb7185;
+  --color-success: #6ee7b7;
+  --color-warning: #f5c76b;
+  --color-danger: #fb7185;
 
   /* Specifics */
-  --color-walrus-purple: #7c3aed;
-  --color-walrus-cyan: #22d3ee;
-  --color-walrus-deep: #0b0f19;
+  --color-walrus-purple: #a78bfa;
+  --color-walrus-cyan: #67d8ef;
+  --color-walrus-deep: #080808;
   --color-walrus-lavender: #c4b5fd;
-  --color-wc-gold: #fbbf24;
+  --color-wc-gold: #f5c76b;
   --color-wc-green: #059669;
   --color-chalk-green: #b4d99a;
   --color-chalk-yellow: #fcd34d;
-  --color-chalk-red: #f87171;
-  --color-chalk-gold: #fbbf24;
+  --color-chalk-red: #fb7185;
+  --color-chalk-gold: #f5c76b;
   --color-chalk-blue: #a8c4d6;
   --color-chalk-indigo: #9a9cc4;
   --color-chalk-gray: #9a9a9a;
@@ -46,10 +46,10 @@
   --color-chalk-orange: #e0a878;
 
   --radius: 0.625rem;
-  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --font-sans: "Geist", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "Geist", ui-sans-serif, system-ui, sans-serif;
 
-  /* Enforce Inter Light (300) and Inter Medium (500) only */
+  /* Geist Light for body copy and Medium for emphasis, including legacy utilities. */
   --font-weight-thin: 300;
   --font-weight-extralight: 300;
   --font-weight-light: 300;
@@ -63,27 +63,27 @@
 
 :root {
   color-scheme: dark;
-  --background: #0a0a0a;
-  --foreground: #fafafa;
-  --card: #171717;
-  --card-foreground: #fafafa;
-  --popover: #171717;
-  --popover-foreground: #fafafa;
-  --primary: #00DD94;
-  --primary-foreground: #0a0a0a;
-  --secondary: #262626;
-  --secondary-foreground: #fafafa;
-  --muted: #262626;
-  --muted-foreground: #a3a3a3;
-  --accent: #262626;
-  --accent-foreground: #fafafa;
-  --destructive: #ef4444;
-  --success: #34d399;
-  --warning: #fbbf24;
-  --danger: #f87171;
-  --border: #262626;
-  --input: #262626;
-  --ring: #00DD94;
+  --background: #080808;
+  --foreground: #ffffff;
+  --card: #141414;
+  --card-foreground: #ffffff;
+  --popover: #141414;
+  --popover-foreground: #ffffff;
+  --primary: #ffffff;
+  --primary-foreground: #080808;
+  --secondary: #292929;
+  --secondary-foreground: #ffffff;
+  --muted: #292929;
+  --muted-foreground: #b0b0b0;
+  --accent: #24202e;
+  --accent-foreground: #ffffff;
+  --destructive: #fb7185;
+  --success: #6ee7b7;
+  --warning: #f5c76b;
+  --danger: #fb7185;
+  --border: #292929;
+  --input: #292929;
+  --ring: #a78bfa;
   --radius: 0.625rem;
 }
 
@@ -104,10 +104,10 @@ html {
 body {
   background-color: var(--background);
   color: var(--foreground);
-  font-family: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+  font-family: "Geist", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
     "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   font-weight: 300;
-  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  font-synthesis: none;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -191,7 +191,7 @@ a {
   --background: var(--color-background);
   --foreground: var(--color-foreground);
   --border: var(--color-border);
-  --font-sans: var(--font-sans);
+  --font-sans: "Geist", ui-sans-serif, system-ui, sans-serif;
   --font-weight-medium: 500;
 }
 
@@ -206,4 +206,19 @@ a {
 
 .antroph-connect-button::part(trigger):hover {
   background-color: var(--color-accent);
+}
+
+/* Keep scores aligned while using the same Geist family throughout the app. */
+.font-mono {
+  font-variant-numeric: tabular-nums;
+}
+
+::selection {
+  background: #a78bfa;
+  color: #080808;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
 }

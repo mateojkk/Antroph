@@ -36,12 +36,12 @@ function classifyMemory(text: string): Memory["type"] {
 }
 
 const TYPE_COLOR: Record<Memory["type"], string> = {
-  prediction: "#38bdf8",
-  hit: "#3fe77e",
-  miss: "#ff5c5c",
-  opinion: "#e0a878",
-  rivalry: "#9a9cc4",
-  match: "#38bdf8",
+  prediction: "#67d8ef",
+  hit: "#6ee7b7",
+  miss: "#fb7185",
+  opinion: "#f5c76b",
+  rivalry: "#a78bfa",
+  match: "#67d8ef",
   memory: "#a1a1aa",
 };
 
