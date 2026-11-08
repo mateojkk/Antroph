@@ -1,43 +1,27 @@
 ﻿1
-00:00:00,000 --> 00:00:07,000
-Antroph — football, with a long memory.
+00:00:00,000 --> 00:00:15,013
+Open a past conversation
 
 2
-00:00:07,000 --> 00:00:22,000
-An AI football rival that remembers what you say.
+00:00:15,013 --> 00:00:38,014
+Ask a follow-up grounded in your past picks
 
 3
-00:00:22,000 --> 00:00:30,000
-Explore the interactive preview: three takes, three rivalries.
+00:00:38,014 --> 00:00:50,013
+Check your hits, misses, and accuracy
 
 4
-00:00:30,000 --> 00:00:39,000
-A bold prediction becomes a receipt the rival can bring up later.
+00:00:50,013 --> 00:01:02,016
+Follow the fixtures and match results
 
 5
-00:00:39,000 --> 00:00:48,000
-The rivalry example gives the conversation a history.
+00:01:02,016 --> 00:01:25,574
+Find a fixture and draft your next call
 
 6
-00:00:48,000 --> 00:00:58,000
-A hot take gives Antroph context for the next reply.
+00:01:25,574 --> 00:01:43,026
+See how the agent's memory grows
 
 7
-00:00:58,000 --> 00:01:13,000
-Connect a Sui wallet, make your profile, and start making picks.
-
-8
-00:01:13,000 --> 00:01:28,000
-Your football history lives in your Walrus Memory account.
-
-9
-00:01:28,000 --> 00:01:43,000
-Wallet setup starts when you choose to enter the game.
-
-10
-00:01:43,000 --> 00:01:54,000
-Make picks, build your record, and come back to the conversation.
-
-11
-00:01:54,000 --> 00:02:00,000
-Your next take is on record. Antroph will remember.
+00:01:43,026 --> 00:02:00,000
+Search and inspect the original prediction
