@@ -44,10 +44,8 @@
     },
     "agentmem": {
       "root": "services/agentmem",
+      "entrypoint": "api/index.mjs",
       "installCommand": "cd ../.. && npm install",
-      "rewrites": [
-        { "source": "/", "destination": "/api/index.mjs" }
-      ],
       "functions": {
         "api/index.mjs": {
           "maxDuration": 60
