@@ -23,6 +23,7 @@ sys.path.insert(0, project_root)
 
 # Static imports guarantee Vercel bundles every handler file into this function.
 from handlers import agent
+from handlers import book
 from handlers import brief
 from handlers import called_it
 from handlers import chat
@@ -45,6 +46,7 @@ from handlers import credibility
 
 HANDLERS = {
     "agent": agent.handler,
+    "book": book.handler,
     "brief": brief.handler,
     "called_it": called_it.handler,
     "chat": chat.handler,

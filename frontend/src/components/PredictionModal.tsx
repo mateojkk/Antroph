@@ -43,7 +43,7 @@ function buildOptionsForGroup(group: MarketGroup): OutcomeOption[] {
 }
 
 export default function PredictionModal({ marketGroup, user, onClose }: Props) {
-  const { memwal, authorized, remember } = useMemWal();
+  const { authorized, remember } = useMemWal();
   const [selected, setSelected] = useState<OutcomeOption | null>(null);
   const [confidence, setConfidence] = useState(5);
   const [take, setTake] = useState("");
@@ -105,7 +105,7 @@ export default function PredictionModal({ marketGroup, user, onClose }: Props) {
       setResult({ pred_id: data.prediction_id });
 
       // Write prediction memories to Walrus from the frontend.
-      if (memwal && authorized) {
+      if (authorized) {
         const { memory_texts } = data;
         const writes: Promise<unknown>[] = [
           remember(memory_texts.remember),

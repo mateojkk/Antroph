@@ -10,7 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@mysten-incubation/memwal": "^0.0.7",
+    "@mysten-incubation/memwal": "^0.1.12",
     "@mysten/dapp-kit-react": "^2.1.37",
     "@mysten/sui": "^2.33.2",
     "@tailwindcss/vite": "^4.3.0",

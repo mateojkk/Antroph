@@ -1,10 +1,9 @@
 import { useEffect, useState, useRef, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { MemWal } from "@mysten-incubation/memwal";
 import { useAuth } from "../hooks/useAuth";
 import { useMemWal } from "../hooks/useMemWal";
-import { apiGet } from "../lib/api";
+import { apiGet, apiPost } from "../lib/api";
 import Layout from "../components/Layout";
 
 interface Memory {
@@ -228,7 +227,6 @@ export default function MemoryMap() {
   const { username } = useParams<{ username?: string }>();
   const { user } = useAuth();
   const {
-    memwal,
     authorized,
     loading: memwalLoading,
     error: memwalError,
@@ -254,32 +252,22 @@ export default function MemoryMap() {
   const mouseRef = useRef({ x: 0, y: 0, dragging: false });
 
   // Public MemWal client for viewing other users' memory when they've made it public
-  const publicMemwal = useMemo<MemWal | null>(() => {
-    if (isOwner) return null;
-    const u = profileData?.user;
-    if (!u?.memory_public || !u.memory_share_key || !u.memwal_account_id) return null;
-    try {
-      return MemWal.create({
-        key: u.memory_share_key,
-        accountId: u.memwal_account_id,
-        serverUrl: `${window.location.origin}/api/memwal`,
-        namespace: u.memory_namespace || "default",
-      });
-    } catch {
-      return null;
-    }
-  }, [isOwner, profileData]);
+  const publicUsername = !isOwner && profileData?.user?.memory_public ? profileData.user.username : null;
 
   const activeRecall = useMemo(() => {
     if (isOwner) return recall;
-    if (publicMemwal) {
-      return async (query: string, options?: { limit?: number; maxDistance?: number }) => {
-        const result = await publicMemwal.recall(query, options);
-        return result as { results: Array<{ text: string; distance: number; blob_id: string }>; total: number };
+    if (!publicUsername) return null;
+    return async (query: string, options?: { limit?: number; maxDistance?: number }) => {
+      const result = await apiPost<{
+        results?: Memory[];
+        total?: number;
+      }>("/book/recall", { username: publicUsername, query, limit: options?.limit });
+      return {
+        results: result?.results ?? [],
+        total: result?.total ?? result?.results?.length ?? 0,
       };
-    }
-    return null;
-  }, [isOwner, recall, publicMemwal]);
+    };
+  }, [isOwner, recall, publicUsername]);
 
   useEffect(() => {
     const targetUser = username || user?.username;
@@ -329,26 +317,9 @@ export default function MemoryMap() {
 
   // Relayer health check
   useEffect(() => {
-    if (!isOwner || !memwal) return;
-    let cancelled = false;
-    healthRef.current = null;
-    memwal
-      .health()
-      .then((h) => {
-        if (cancelled) return;
-        healthRef.current = { ok: true, message: `Relayer ${h.version} ${h.mode || ""}`.trim() };
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        healthRef.current = {
-          ok: false,
-          message: err instanceof Error ? err.message : String(err),
-        };
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [isOwner, memwal]);
+    if (!isOwner || !authorized) return;
+    healthRef.current = { ok: true, message: "Memory is granted to Antroph" };
+  }, [isOwner, authorized]);
 
   useEffect(() => {
     if (!activeRecall) return;
@@ -498,7 +469,7 @@ export default function MemoryMap() {
         </Layout>
       );
     }
-    if (!publicMemwal) {
+    if (!publicUsername) {
       return (
         <Layout>
           <div className="mx-auto flex max-w-md flex-col items-center justify-center rounded-md border border-border bg-card p-10 text-center">
@@ -728,7 +699,7 @@ export default function MemoryMap() {
         </div>
       </div>
 
-      {(accountId || (publicMemwal && profileData?.user?.memwal_account_id)) && (
+      {(accountId || profileData?.user?.memwal_account_id) && (
         <footer className="mt-8 border-t border-border pt-4 text-center">
           <a
             href={`https://suivision.xyz/object/${isOwner ? accountId : profileData?.user?.memwal_account_id}`}

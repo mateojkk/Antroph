@@ -10,6 +10,10 @@ import {
   agentRecall,
   agentRememberBulk,
   agentConfigStatus,
+  delegatePublicKeyHex,
+  userRemember,
+  userRecall,
+  userDelegateStatus,
 } from "@antroph/agent-mem";
 
 export default async function handler(req, res) {
@@ -36,12 +40,6 @@ export default async function handler(req, res) {
     return respond(res, 405, { error: "Method not allowed" });
   }
 
-  if (!status.configured) {
-    return respond(res, 503, {
-      error: "Agent memory not configured. Set MEMWAL_AGENT_PRIVATE_KEY and MEMWAL_AGENT_ACCOUNT_ID.",
-    });
-  }
-
   let body = {};
   try {
     body = JSON.parse((await readBody(req)) || "{}");
@@ -51,6 +49,36 @@ export default async function handler(req, res) {
 
   const op = body.op || "remember";
   try {
+    if (op === "delegatePublic") {
+      const publicKey = await delegatePublicKeyHex();
+      return respond(res, 200, { publicKey });
+    }
+
+    if (op === "userStatus") {
+      return respond(res, 200, await userDelegateStatus(body.accountId, body.namespace));
+    }
+
+    if (op === "userRemember") {
+      const result = await userRemember(body.accountId, body.namespace, body.text);
+      return respond(res, 200, { ok: true, result });
+    }
+
+    if (op === "userRecall") {
+      const result = await userRecall(
+        body.accountId,
+        body.namespace,
+        body.query || "",
+        Math.min(Math.max(Number(body.limit) || 10, 1), 50)
+      );
+      return respond(res, 200, result);
+    }
+
+    if (!status.configured) {
+      return respond(res, 503, {
+        error: "Agent memory not configured. Set MEMWAL_AGENT_PRIVATE_KEY and MEMWAL_AGENT_ACCOUNT_ID.",
+      });
+    }
+
     if (op === "remember") {
       if (body.waitFor) {
         const result = await agentRememberAndWait(body.text);

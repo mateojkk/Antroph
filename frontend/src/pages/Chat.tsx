@@ -43,7 +43,6 @@ function formatRelative(iso: string): string {
 export default function Chat() {
   const { user } = useAuth();
   const {
-    memwal,
     authorized,
     loading: memwalLoading,
     error: memwalError,
@@ -204,7 +203,7 @@ export default function Chat() {
 
     try {
       let memoryContext: MemoryContext | undefined;
-      if (memwal && authorized) {
+      if (authorized) {
         try {
           memoryContext = await buildMemoryContext(msg, messages);
         } catch (err) {
@@ -251,7 +250,7 @@ export default function Chat() {
 
       // Fire-and-forget memory writes — we don't need to wait for the
       // Walrus upload to complete, just submit the jobs to the relayer.
-      if (memwal && authorized) {
+      if (authorized) {
         setMemoryStatus("saving");
         setMemoryError(null);
         Promise.all([

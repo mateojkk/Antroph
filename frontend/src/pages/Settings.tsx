@@ -29,8 +29,6 @@ export default function Settings() {
   const [copied, setCopied] = useState(false);
   const [profileLoaded, setProfileLoaded] = useState(false);
 
-  const walletAddress = user?.email || "";
-
   useEffect(() => {
     if (!user?.username || profileLoaded) return;
     let cancelled = false;
@@ -49,19 +47,6 @@ export default function Settings() {
     };
   }, [user?.username, profileLoaded]);
 
-  function getDelegatePrivateKey(): string | null {
-    try {
-      const raw = localStorage.getItem(`vela_memwal_delegate_${walletAddress}`);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        return parsed.privateKey || null;
-      }
-    } catch {
-      // no delegate key
-    }
-    return null;
-  }
-
   async function toggleMemoryPublic(next: boolean) {
     if (!user?.email) return;
     setToggling(true);
@@ -73,13 +58,6 @@ export default function Settings() {
         email: user.email,
         memory_public: next,
       };
-      if (next) {
-        const privateKey = getDelegatePrivateKey();
-        if (!privateKey) {
-          throw new Error("No delegate key found — connect your wallet and authorize memory first.");
-        }
-        patch.memory_share_key = privateKey;
-      }
       await apiPatch("/profile", patch);
       await refreshUser();
       queryClient.invalidateQueries({ queryKey: ["profile", user.username] });

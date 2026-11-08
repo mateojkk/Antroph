@@ -1,12 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useCurrentAccount, useDAppKit } from "@mysten/dapp-kit-react";
-import { MemWal } from "@mysten-incubation/memwal";
-import {
-  createAccount,
-  generateDelegateKey,
-} from "@mysten-incubation/memwal/account";
-import { Transaction } from "@mysten/sui/transactions";
-import { apiGet, apiPatch } from "../lib/api";
+import { createAccount, addDelegateKey } from "@mysten-incubation/memwal/account";
+import type { Transaction } from "@mysten/sui/transactions";
+import { apiGet, apiPatch, apiPost } from "../lib/api";
 import { findMemWalAccountId, grpcClient, type SuiNetwork } from "../lib/suiClient";
 import { useAuth } from "./useAuth";
 
@@ -27,50 +23,12 @@ function transactionDigest(result: unknown): string {
   return "";
 }
 
-// Always route MemWal requests through our own backend proxy (/api/memwal).
-// The upstream relayer (relayer.memory.walrus.xyz) doesn't return
-// Access-Control-Allow-Origin on CORS preflights, so the browser blocks
-// direct requests with "Failed to fetch".  The proxy forwards the signed
-// MemWal headers unchanged so the relayer's auth still works.
-//
-// VITE_MEMWAL_SERVER_URL is intentionally ignored here — it pointed directly
-// at the relayer and bypassed the proxy, re-introducing the CORS failure.
-const SUI_CLOCK =
-  "0x0000000000000000000000000000000000000000000000000000000000000006";
-const SERVER_URL = `${window.location.origin}/api/memwal`;
-const PACKAGE_ID = import.meta.env.VITE_MEMWAL_PACKAGE_ID;
-const REGISTRY_ID = import.meta.env.VITE_MEMWAL_REGISTRY_ID;
-
-interface StoredDelegate {
-  privateKey: string;
-  publicKey: string;
-  suiAddress: string;
-}
-
-function delegateKey(address: string) {
-  return `vela_memwal_delegate_${address}`;
-}
-
 function accountKey(address: string) {
   return `vela_memwal_account_${address}`;
 }
 
 function authorizedKey(address: string) {
-  return `vela_memwal_authorized_${address}`;
-}
-
-function loadDelegate(address: string): StoredDelegate | null {
-  const raw = localStorage.getItem(delegateKey(address));
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw) as StoredDelegate;
-  } catch {
-    return null;
-  }
-}
-
-function saveDelegate(address: string, delegate: StoredDelegate) {
-  localStorage.setItem(delegateKey(address), JSON.stringify(delegate));
+  return `vela_memwal_server_authorized_${address}`;
 }
 
 function loadAccountId(address: string): string | null {
@@ -93,45 +51,6 @@ function markAuthorized(address: string, value: boolean) {
   }
 }
 
-async function getOrCreateDelegate(address: string): Promise<StoredDelegate> {
-  const existing = loadDelegate(address);
-  if (existing) return existing;
-  const delegate = await generateDelegateKey();
-  const stored: StoredDelegate = {
-    privateKey: delegate.privateKey,
-    publicKey: bytesToHex(delegate.publicKey),
-    suiAddress: delegate.suiAddress,
-  };
-  saveDelegate(address, stored);
-  return stored;
-}
-
-function bytesToHex(bytes: Uint8Array): string {
-  return Array.from(bytes)
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-function hexToBytes(hex: string): Uint8Array {
-  const clean = hex.startsWith("0x") ? hex.slice(2) : hex;
-  const bytes = new Uint8Array(clean.length / 2);
-  for (let i = 0; i < clean.length; i += 2) {
-    bytes[i / 2] = parseInt(clean.slice(i, i + 2), 16);
-  }
-  return bytes;
-}
-
-function isAuthError(err: unknown): boolean {
-  const msg = String(err).toLowerCase();
-  return (
-    msg.includes("unauthorized") ||
-    msg.includes("delegate") ||
-    msg.includes("permission") ||
-    msg.includes("not authorized") ||
-    msg.includes("invalid signature")
-  );
-}
-
 function isAccountAlreadyExistsError(err: unknown): boolean {
   const msg = String(err).toLowerCase();
   return (
@@ -148,30 +67,15 @@ function isAccountAlreadyExistsError(err: unknown): boolean {
  * window, so an older account looks missing even though create_account aborts.
  */
 async function findExistingAccount(
-  packageId: string,
-  address: string
+  address: string,
+  registryId: string
 ): Promise<string | null> {
-  if (REGISTRY_ID) {
-    try {
-      const fromRegistry = await findMemWalAccountId(REGISTRY_ID, address);
-      if (fromRegistry) return fromRegistry;
-    } catch {
-      // Registry read failed. Fall through to the event scan.
-    }
-  }
-
-  try {
-    const result = await apiGet<{ found?: boolean; account_id?: string | null }>(
-      `/sui/account?address=${encodeURIComponent(address)}&package=${encodeURIComponent(packageId)}`
-    );
-    return result?.account_id ?? null;
-  } catch {
-    return null;
-  }
+  // A failed lookup must stop setup rather than trigger duplicate creation.
+  return findMemWalAccountId(registryId, address, SUI_NETWORK);
 }
 
 export interface UseMemWalResult {
-  memwal: MemWal | null;
+  memwal: null;
   delegateAddress: string | null;
   accountId: string | null;
   authorized: boolean | null;
@@ -195,43 +99,23 @@ export function useMemWal(): UseMemWalResult {
   const chainClient = useMemo(() => grpcClient(SUI_NETWORK), []);
   const { user } = useAuth();
 
-  const [delegate, setDelegate] = useState<StoredDelegate | null>(null);
-  const [accountId, setAccountId] = useState<string | null>(null);
-  const [authorized, setAuthorized] = useState<boolean | null>(null);
+  const [accounts, setAccounts] = useState<Record<string, string>>({});
+  const [grants, setGrants] = useState<Record<string, boolean>>({});
+  const accountId = address
+    ? accounts[address] ?? loadAccountId(address) ?? user?.memwal_account_id ?? null
+    : null;
+  const authorized = address && accountId
+    ? grants[address] ?? (isMarkedAuthorized(address) ? true : null)
+    : null;
+  const setAccountId = useCallback((id: string) => {
+    if (address) setAccounts((previous) => ({ ...previous, [address]: id }));
+  }, [address]);
+  const setAuthorized = useCallback((value: boolean) => {
+    if (address) setGrants((previous) => ({ ...previous, [address]: value }));
+  }, [address]);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!address) return;
-    // Load a key the user already granted. Do not generate one here: minting a
-    // private key the moment a wallet connects is the pattern Slush reads as a
-    // standing delegate. People Book only creates the key when the user starts
-    // the grant.
-    const existing = loadDelegate(address);
-    setDelegate(existing);
-
-    let storedAccountId = loadAccountId(address);
-    if (!storedAccountId && user?.memwal_account_id) {
-      storedAccountId = user.memwal_account_id;
-      saveAccountId(address, storedAccountId);
-    }
-    setAccountId(storedAccountId);
-
-    const marked = isMarkedAuthorized(address);
-    const canAuthorize = !!(storedAccountId && existing);
-    setAuthorized(marked && canAuthorize ? true : marked ? false : null);
-  }, [address, user?.memwal_account_id]);
-
-  const memwal = useMemo(() => {
-    if (!delegate || !accountId) return null;
-    return MemWal.create({
-      key: delegate.privateKey,
-      accountId,
-      serverUrl: SERVER_URL,
-      namespace: address ?? "default",
-    });
-  }, [delegate, accountId, address]);
 
   const walletSigner = useMemo(() => {
     if (!address) return null;
@@ -251,9 +135,6 @@ export function useMemWal(): UseMemWalResult {
         }
         return { digest };
       },
-      signPersonalMessage: async ({ message }: { message: Uint8Array }) => {
-        return dAppKit.signPersonalMessage({ message });
-      },
     };
   }, [address, dAppKit]);
 
@@ -262,40 +143,31 @@ export function useMemWal(): UseMemWalResult {
       setError("Wallet not connected");
       return;
     }
-    const activeDelegate = delegate ?? (await getOrCreateDelegate(address));
-    if (!delegate) setDelegate(activeDelegate);
     if (!walletSigner) {
       setError("Wallet signer not ready");
       return;
     }
-    if (!SERVER_URL) {
-      // SERVER_URL has a built-in fallback; this branch is unreachable in
-      // normal operation but kept as a safety net.
-      setError("MemWal server URL not configured.");
-      return;
-    }
-    if (!PACKAGE_ID) {
-      setError(
-        `VITE_MEMWAL_PACKAGE_ID is not set (value: ${typeof import.meta.env.VITE_MEMWAL_PACKAGE_ID}). Redeploy after setting env vars.`
-      );
-      return;
-    }
-    if (!REGISTRY_ID) {
-      setError(
-        `VITE_MEMWAL_REGISTRY_ID is not set (value: ${typeof import.meta.env.VITE_MEMWAL_REGISTRY_ID}). Redeploy after setting env vars.`
-      );
-      return;
-    }
-
     setLoading(true);
     setError(null);
-    setStatus("Looking up your Walrus Memory account…");
+    setStatus("Looking up your Walrus Memory account...");
 
     try {
-      let currentAccountId = loadAccountId(address);
+      const [{ packageId, registryId }, setup] = await Promise.all([
+        apiGet<{ packageId: string; registryId: string }>("/book/deployment"),
+        apiGet<{ accountId: string | null; hasDelegate: boolean }>("/book/status"),
+      ]);
+      let currentAccountId = setup.accountId ?? loadAccountId(address);
+      if (setup.accountId && setup.hasDelegate) {
+        saveAccountId(address, setup.accountId);
+        setAccountId(setup.accountId);
+        markAuthorized(address, true);
+        setAuthorized(true);
+        setStatus(null);
+        return;
+      }
 
       if (!currentAccountId) {
-        currentAccountId = await findExistingAccount(PACKAGE_ID, address);
+        currentAccountId = await findExistingAccount(address, registryId);
         if (currentAccountId && address) {
           saveAccountId(address, currentAccountId);
           setAccountId(currentAccountId);
@@ -303,12 +175,13 @@ export function useMemWal(): UseMemWalResult {
       }
 
       if (!currentAccountId) {
-        setStatus("Creating your Walrus Memory account…");
+        setStatus("Creating your Walrus Memory account...");
         try {
           const created = await createAccount({
-            packageId: PACKAGE_ID,
-            registryId: REGISTRY_ID,
-            walletSigner,
+            packageId,
+            registryId,
+            // The SDK type also requires message signing for unrelated manual APIs.
+            walletSigner: walletSigner as never,
             suiClient: chainClient as never,
             suiNetwork: MEMWAL_NETWORK,
           });
@@ -319,13 +192,12 @@ export function useMemWal(): UseMemWalResult {
           }
         } catch (createErr) {
           if (isAccountAlreadyExistsError(createErr)) {
-            // Account was created between our event scan and the create call.
-            // Re-scan to pick it up.
-            currentAccountId = await findExistingAccount(PACKAGE_ID, address);
+            // Another request may have created the account after the lookup.
+            currentAccountId = await findExistingAccount(address, registryId);
             if (!currentAccountId) {
               throw new Error(
                 "An account already exists for this wallet, but Antroph could not discover its ID. " +
-                  "Please create a fresh wallet or check your account on https://memory.walrus.xyz.",
+                  "Check your account on https://memory.walrus.xyz and retry.",
                 { cause: createErr }
               );
             }
@@ -343,38 +215,33 @@ export function useMemWal(): UseMemWalResult {
         throw new Error("Could not create or find a Walrus Memory account.");
       }
 
-      setStatus("Authorizing this device…");
-      const pkBytes = hexToBytes(activeDelegate.publicKey);
-      // The published contract is add_delegate_key(account, registry, key, label, clock).
-      // memwal 0.0.7 still passes the key as the second argument, which the chain
-      // rejects as InvalidUsageOfPureArg.
-      const tx = new Transaction();
-      tx.moveCall({
-        target: `${PACKAGE_ID}::account::add_delegate_key`,
-        arguments: [
-          tx.object(currentAccountId),
-          tx.object(REGISTRY_ID),
-          tx.pure.vector("u8", Array.from(pkBytes)),
-          tx.pure.string(`Antroph ${address.slice(0, 8)}`),
-          tx.object(SUI_CLOCK),
-        ],
-      });
-      await walletSigner.signAndExecuteTransaction({ transaction: tx });
-
-      setAuthorized(true);
-      if (address) {
-        markAuthorized(address, true);
-        // Persist to Supabase so the account ID survives browser changes.
-        try {
-          await apiPatch("/profile", {
-            email: address,
-            memwal_account_id: currentAccountId,
-          });
-        } catch (persistErr) {
-          // localStorage already has the account ID; a profile sync failure is non-fatal here.
-          console.warn("Failed to persist MemWal account ID to profile:", persistErr);
+      setStatus("Authorizing Antroph...");
+      const { publicKey } = await apiGet<{ publicKey: string }>("/book/delegate-key");
+      try {
+        await addDelegateKey({
+          packageId,
+          registryId,
+          accountId: currentAccountId,
+          publicKey,
+          label: "Antroph",
+          walletSigner: walletSigner as never,
+          suiClient: chainClient as never,
+          suiNetwork: MEMWAL_NETWORK,
+        });
+      } catch (grantErr) {
+        if (!/abort code:\s*0\b/.test(grantErr instanceof Error ? grantErr.message : String(grantErr))) {
+          throw grantErr;
         }
       }
+
+      // Server memory calls resolve the account from the profile, so persist it
+      // before declaring setup complete. Retrying an existing grant is safe.
+      await apiPatch("/profile", {
+        email: address,
+        memwal_account_id: currentAccountId,
+      });
+      markAuthorized(address, true);
+      setAuthorized(true);
       setStatus(null);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -383,73 +250,41 @@ export function useMemWal(): UseMemWalResult {
     } finally {
       setLoading(false);
     }
-  }, [address, delegate, walletSigner, chainClient]);
+  }, [address, walletSigner, chainClient, setAccountId, setAuthorized]);
 
   const remember = useCallback(
     async (text: string) => {
-      if (!memwal) throw new Error("MemWal not ready");
-      try {
-        const result = await memwal.remember(text);
-        if (address) markAuthorized(address, true);
-        setAuthorized(true);
-        return result;
-      } catch (err) {
-        if (isAuthError(err) && address) {
-          markAuthorized(address, false);
-          setAuthorized(false);
-        }
-        throw err;
-      }
+      if (!accountId) throw new Error("MemWal not ready");
+      return apiPost("/book/remember", { text });
     },
-    [memwal, address]
+    [accountId]
   );
 
   const rememberAndWait = useCallback(
-    async (text: string, timeoutMs = 15_000) => {
-      if (!memwal) throw new Error("MemWal not ready");
-      try {
-        const result = await memwal.rememberAndWait(text, undefined, { timeoutMs });
-        if (address) markAuthorized(address, true);
-        setAuthorized(true);
-        return result;
-      } catch (err) {
-        if (isAuthError(err) && address) {
-          markAuthorized(address, false);
-          setAuthorized(false);
-        }
-        throw err;
-      }
-    },
-    [memwal, address]
+    async (text: string) => remember(text),
+    [remember]
   );
 
   const recall = useCallback(
     async (query: string, options?: { limit?: number; maxDistance?: number }) => {
-      if (!memwal) throw new Error("MemWal not ready");
-      try {
-        const result = await memwal.recall(query, options);
-        if (address) markAuthorized(address, true);
-        setAuthorized(true);
-        return result as {
-          results: Array<{ text: string; distance: number; blob_id: string }>;
-          total: number;
-        };
-      } catch (err) {
-        if (isAuthError(err) && address) {
-          markAuthorized(address, false);
-          setAuthorized(false);
-        }
-        throw err;
-      }
+      if (!accountId) throw new Error("MemWal not ready");
+      const result = await apiPost<{
+        results?: Array<{ text: string; distance: number; blob_id: string }>;
+        total?: number;
+      }>("/book/recall", { query, limit: options?.limit });
+      return {
+        results: result?.results ?? [],
+        total: result?.total ?? result?.results?.length ?? 0,
+      };
     },
-    [memwal, address]
+    [accountId]
   );
 
   const clearError = useCallback(() => setError(null), []);
 
   return {
-    memwal,
-    delegateAddress: delegate?.suiAddress ?? null,
+    memwal: null,
+    delegateAddress: null,
     accountId,
     authorized,
     loading,
