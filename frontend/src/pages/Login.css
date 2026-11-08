@@ -23,7 +23,7 @@
 .login-page a, .login-page button { -webkit-tap-highlight-color: transparent; }
 .login-skip { position: absolute; z-index: 10; top: -100px; left: 20px; padding: 12px; color: #080808; background: #fff; }
 .login-skip:focus { top: 12px; }
-.login-header { display: flex; height: 86px; flex: 0 0 auto; align-items: center; justify-content: space-between; border-bottom: 1px solid #292929; }
+.login-header { display: flex; height: 86px; flex: 0 0 auto; align-items: center; justify-content: space-between; }
 .login-brand { display: flex; align-items: center; gap: 10px; font-size: 23px; font-weight: 500; letter-spacing: -1.2px; }
 .login-brand img { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; }
 .login-brand .brand-dot { align-self: flex-start; margin-top: 5px; margin-left: -7px; color: #c4b5fd; font-size: 11px; letter-spacing: 0; }
@@ -36,7 +36,7 @@
 .login-story h1 { margin: 0; font-size: clamp(52px, 6.4vw, 84px); font-weight: 500; letter-spacing: -.065em; line-height: .99; }
 .login-story h1 span { color: #898989; }
 .login-lede { max-width: 330px; margin: 22px 0 0; color: #aaa; font-size: 15px; line-height: 1.7; }
-.login-card { padding: 30px; border: 1px solid #303030; border-radius: 12px; background: #121212; box-shadow: 0 25px 90px #0006; }
+.login-card { padding: 30px 0; background: transparent; }
 .login-card-brand { display: flex; align-items: center; gap: 9px; color: #888; font-size: 8px; font-weight: 500; letter-spacing: 1.3px; }
 .login-card-brand img { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; }
 .login-card-kicker { margin: 25px 0 10px; color: #c4b5fd; font-size: 9px; font-weight: 500; letter-spacing: 1.6px; }
@@ -46,29 +46,29 @@
 .login-connect-button .antroph-connect-button { width: 100%; }
 .login-connect-button .antroph-connect-button::part(trigger) { display: flex; width: 100%; min-height: 52px; align-items: center; justify-content: center; border: 0; border-radius: 7px; color: #080808; background: #fff; font-family: "Geist", ui-sans-serif, sans-serif; font-size: 13px; font-weight: 500; transition: background .2s, transform .2s; }
 .login-connect-button .antroph-connect-button::part(trigger):hover { transform: translateY(-1px); background: #c4b5fd; }
-.login-divider { margin-top: 25px; padding-top: 18px; border-top: 1px solid #292929; }
+.login-divider { margin-top: 25px; padding-top: 0; }
 .login-divider span { color: #777; font-size: 8px; font-weight: 500; letter-spacing: 1.4px; }
 .login-next-steps { display: grid; gap: 13px; margin: 15px 0 20px; padding: 0; list-style: none; }
 .login-next-steps li { display: flex; align-items: center; gap: 12px; }
-.login-next-steps li > span { display: grid; width: 22px; height: 22px; flex: 0 0 auto; place-items: center; border: 1px solid #484848; border-radius: 50%; color: #c4b5fd; font-size: 9px; }
+.login-next-steps li > span { display: grid; width: 22px; height: 22px; flex: 0 0 auto; place-items: center; border: 0; color: #c4b5fd; font-size: 9px; }
 .login-next-steps p { margin: 0; color: #ccc; font-size: 11px; line-height: 1.5; }
-.login-gas-note { display: flex; align-items: flex-start; gap: 10px; margin-top: 18px; padding: 11px; border: 1px solid #f5c76b26; border-radius: 6px; background: #f5c76b0c; }
+.login-gas-note { display: flex; align-items: flex-start; gap: 10px; margin-top: 18px; padding: 0; background: transparent; }
 .login-gas-note > span { color: #f5c76b; font-size: 8px; font-weight: 500; padding-top: 2px; }
 .login-gas-note p { margin: 0; color: #b7ac91; font-size: 10px; line-height: 1.55; }
 .login-privacy { margin: 15px 0 0; color: #777; text-align: center; font-size: 9px; }
-.login-footer { display: flex; width: min(1040px, 100%); min-height: 68px; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: 18px; margin: 0 auto; border-top: 1px solid #292929; color: #888; font-size: 10px; }
+.login-footer { display: flex; width: min(1040px, 100%); min-height: 68px; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: 18px; margin: 0 auto; color: #888; font-size: 10px; }
 .login-footer a { color: #ccc; }
 .login-footer a span { margin-left: 7px; }
 @media (max-width: 760px) {
   .login-page { padding-inline: 24px; }
   .login-header { height: 72px; }
   .login-layout { min-height: auto; padding: 45px 0; }
-  .login-card { padding: 24px; }
+  .login-card { padding: 24px 0; }
 }
 @media (max-width: 390px) {
   .login-page { padding-inline: 18px; }
   .login-back { font-size: 10px; }
-  .login-card { padding: 20px; }
+  .login-card { padding: 20px 0; }
   .login-footer { font-size: 9px; }
 }
 @media (prefers-reduced-motion: reduce) {
