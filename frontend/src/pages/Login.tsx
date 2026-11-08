@@ -26,8 +26,6 @@ export default function Login() {
 
       <div className="login-layout">
         <section id="login-connect" className="login-card" aria-labelledby="connect-title">
-          <div className="login-card-brand"><img src="/antroph.jpg" alt="" /><span>ANTROPH / SUI MAINNET</span></div>
-          <p className="login-card-kicker">FIRST, PICK YOUR SIDE.</p>
           <h2 id="connect-title">Connect your wallet.</h2>
           <p className="login-card-copy">Your Sui wallet is your ticket in. Connect to set up your profile and start a rivalry with a long memory.</p>
           <div className="login-connect-button">
