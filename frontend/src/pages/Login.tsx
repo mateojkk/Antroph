@@ -26,45 +26,26 @@ export default function Login() {
 
       <div className="login-layout">
         <section className="login-story" aria-labelledby="login-title">
-          <p className="login-eyebrow"><span className="login-live-dot" /> THE GAME HAS A MEMORY</p>
-          <h1 id="login-title">Every take<br />starts <span>somewhere.</span></h1>
-          <p className="login-lede">Bring your football opinions. Meet the rival who remembers every one.</p>
-
-          <div className="login-ticket">
-            <div className="ticket-top"><span>ANTROPH / MATCHDAY 001</span><span>YOUR RECEIPT</span></div>
-            <div className="ticket-center"><span>YOU, BEFORE KICKOFF</span><p>“They've got<br />no chance.”</p></div>
-            <div className="ticket-bottom"><span>FAMOUS LAST WORDS?</span><span className="ticket-stamp">SAVED ✳</span></div>
-          </div>
-
-          <div className="login-points">
-            <div><span className="point-icon point-lilac">01</span><p><b>Make the call.</b><br />Predictions, takes, team loyalties.</p></div>
-            <div><span className="point-icon point-mint">02</span><p><b>Keep the receipts.</b><br />Your football story, remembered.</p></div>
-          </div>
+          <p className="login-eyebrow"><span className="login-live-dot" /> YOUR RIVAL REMEMBERS</p>
+          <h1 id="login-title">Talk football.<br /><span>Leave receipts.</span></h1>
+          <p className="login-lede">Connect your wallet to get in the game.</p>
         </section>
 
         <section id="login-connect" className="login-card" aria-labelledby="connect-title">
           <div className="login-card-brand"><img src="/antroph.jpg" alt="" /><span>ANTROPH / SUI MAINNET</span></div>
-          <p className="login-card-kicker">FIRST, PICK YOUR SIDE.</p>
-          <h2 id="connect-title">Connect your wallet.</h2>
-          <p className="login-card-copy">Your Sui wallet is your ticket in. Connect to set up your profile and start a rivalry with a long memory.</p>
+          <p className="login-card-kicker">SUI MAINNET</p>
+          <h2 id="connect-title">You in?</h2>
+          <p className="login-card-copy">Connect a Sui wallet to meet your football rival.</p>
 
           <div className="login-connect-button">
             <ConnectButton className="antroph-connect-button">Connect Sui Wallet</ConnectButton>
           </div>
 
-          <div className="login-divider"><span>WHAT HAPPENS NEXT</span></div>
-          <ol className="login-next-steps">
-            <li><span>1</span><p>Choose a username and make the profile yours.</p></li>
-            <li><span>2</span><p>Authorize your memory account with one wallet transaction.</p></li>
-            <li><span>3</span><p>Jump into the chat. The next take is on you.</p></li>
-          </ol>
-
-          <div className="login-gas-note"><span aria-hidden="true">◈</span><p>Memory setup needs a small amount of SUI for gas. Your wallet will show the transaction before you approve.</p></div>
-          <p className="login-privacy">Your wallet controls the memory access grant.</p>
+          <div className="login-gas-note"><span aria-hidden="true">◈</span><p>Memory setup uses a small amount of SUI for gas.</p></div>
         </section>
       </div>
 
-      <footer className="login-footer"><span>Football ends. The conversation doesn't.</span><Link to="/about">Meet Antroph <span aria-hidden="true">↗</span></Link></footer>
+      <footer className="login-footer"><span>Football ends. The conversation doesn't.</span><Link to="/about">More about Antroph <span aria-hidden="true">↗</span></Link></footer>
     </main>
   );
 }
