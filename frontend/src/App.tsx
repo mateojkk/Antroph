@@ -5,6 +5,7 @@ import { useAuth, AuthProvider } from "./hooks/useAuth";
 import { apiGet } from "./lib/api";
 import type { MarketGroup } from "../../shared/types";
 import Login from "./pages/Login";
+import Landing from "./pages/Landing";
 import Onboarding from "./pages/Onboarding";
 import Chat from "./pages/Chat";
 import Feed from "./pages/Feed";
@@ -37,6 +38,13 @@ function LoadingScreen() {
       </div>
     </div>
   );
+}
+
+function Home() {
+  const { user, loading } = useAuth();
+  if (loading) return <LoadingScreen />;
+  if (!user) return <Landing />;
+  return <ProtectedRoute><Chat /></ProtectedRoute>;
 }
 
 function PrefetchData() {
@@ -82,11 +90,10 @@ export default function App() {
               <Route
                 path="/"
                 element={
-                  <ProtectedRoute>
-                    <Chat />
-                  </ProtectedRoute>
+                  <Home />
                 }
               />
+              <Route path="/about" element={<Landing />} />
               <Route
                 path="/feed"
                 element={
