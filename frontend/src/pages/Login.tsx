@@ -28,12 +28,19 @@ export default function Login() {
         <section id="login-connect" className="login-card" aria-labelledby="connect-title">
           <div className="login-card-brand"><img src="/antroph.jpg" alt="" /><span>ANTROPH / SUI MAINNET</span></div>
           <p className="login-card-kicker">FIRST, PICK YOUR SIDE.</p>
-          <h1 id="connect-title">Connect your wallet.</h1>
-          <p className="login-card-copy">Your Sui wallet is your ticket in.</p>
+          <h2 id="connect-title">Connect your wallet.</h2>
+          <p className="login-card-copy">Your Sui wallet is your ticket in. Connect to set up your profile and start a rivalry with a long memory.</p>
           <div className="login-connect-button">
             <ConnectButton className="antroph-connect-button">Connect Sui Wallet</ConnectButton>
           </div>
-          <div className="login-gas-note"><span aria-hidden="true">?</span><p>Memory setup uses a small amount of SUI for gas.</p></div>
+          <div className="login-divider"><span>WHAT HAPPENS NEXT</span></div>
+          <ol className="login-next-steps">
+            <li><span>1</span><p>Choose a username and make the profile yours.</p></li>
+            <li><span>2</span><p>Authorize your memory account with one wallet transaction.</p></li>
+            <li><span>3</span><p>Jump into the chat. The next take is on you.</p></li>
+          </ol>
+          <div className="login-gas-note"><span aria-hidden="true">SUI</span><p>Memory setup needs a small amount of SUI for gas. Your wallet will show the transaction before you approve.</p></div>
+          <p className="login-privacy">Your wallet controls the memory access grant.</p>
         </section>
       </div>
 
