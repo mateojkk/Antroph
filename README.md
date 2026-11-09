@@ -2,6 +2,8 @@
 
 **An AI football rival that never forgets.**
 
+**Live app:** [antroph-ookd.vercel.app](https://antroph-ookd.vercel.app)
+
 Antroph is a football companion you argue with. Connect a Sui wallet, call matches, talk trash, and let Antroph remember every take. When matches finish, settlement writes a **scorecard memory** to **Walrus Memory on Sui mainnet**; the feed then shows what Antroph learned, including confidence-bucket accuracy and lessons recalled from its own memory namespace.
 
 Built for **Total Recall: Tatum × Walrus Memory** — **Track 1: Markets & Sports Prediction**.
