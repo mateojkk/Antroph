@@ -6,7 +6,9 @@ Calls the API directly (same as livescores.py) to avoid any library issues.
 
 import os
 import json
+import datetime
 import urllib.request
+import urllib.parse
 from http.server import BaseHTTPRequestHandler
 from lib.common import send_json, options
 
@@ -22,8 +24,14 @@ class handler(BaseHTTPRequestHandler):
             return
 
         try:
+            today = datetime.datetime.now(datetime.timezone.utc).date()
+            end = today + datetime.timedelta(days=7)
+            query = urllib.parse.urlencode({
+                "dateFrom": today.isoformat(),
+                "dateTo": end.isoformat(),
+            })
             req = urllib.request.Request(
-                "https://api.football-data.org/v4/matches",
+                f"https://api.football-data.org/v4/matches?{query}",
                 headers={"X-Auth-Token": api_key},
             )
             with urllib.request.urlopen(req, timeout=8) as response:
@@ -44,6 +52,7 @@ class handler(BaseHTTPRequestHandler):
                 mid = m.get("id")
                 utc_date = m.get("utcDate", "")
                 status = m.get("status", "SCHEDULED")
+                closed = status in {"FINISHED", "AWARDED", "CANCELLED", "POSTPONED"}
 
                 slug = f"{home.lower().replace(' ', '-')}-vs-{away.lower().replace(' ', '-')}-match-{mid}"
                 question = f"{home} vs {away}"
@@ -56,8 +65,8 @@ class handler(BaseHTTPRequestHandler):
                         "no_price": 0.67,
                         "volume": 0,
                         "game_start_time": utc_date,
-                        "closed": status in ["FINISHED", "AWARDED"],
-                        "active": status not in ["FINISHED", "AWARDED"],
+                        "closed": closed,
+                        "active": not closed,
                     },
                     {
                         "id": f"{mid}_draw",
@@ -66,8 +75,8 @@ class handler(BaseHTTPRequestHandler):
                         "no_price": 0.67,
                         "volume": 0,
                         "game_start_time": utc_date,
-                        "closed": status in ["FINISHED", "AWARDED"],
-                        "active": status not in ["FINISHED", "AWARDED"],
+                        "closed": closed,
+                        "active": not closed,
                     },
                     {
                         "id": f"{mid}_away",
@@ -76,8 +85,8 @@ class handler(BaseHTTPRequestHandler):
                         "no_price": 0.67,
                         "volume": 0,
                         "game_start_time": utc_date,
-                        "closed": status in ["FINISHED", "AWARDED"],
-                        "active": status not in ["FINISHED", "AWARDED"],
+                        "closed": closed,
+                        "active": not closed,
                     },
                 ]
 
